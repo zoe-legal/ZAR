@@ -1,0 +1,5 @@
+{
+  "aws_region": "us-west-1",
+  "clerk_secret_id": "devconfig",
+  "onboarding_database_secret_id": "zar_onboarding_db_config"
+}

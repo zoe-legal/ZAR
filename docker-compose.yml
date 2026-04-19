@@ -1,0 +1,22 @@
+services:
+  zar-backend:
+    build:
+      context: ./backend
+    ports:
+      - "8788:8788"
+    environment:
+      AWS_PROFILE: ${AWS_PROFILE:-}
+    volumes:
+      - ~/.aws:/home/node/.aws:ro
+
+  sample-frontend:
+    build:
+      context: ./sample_frontend
+      args:
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+        VITE_ZAR_BASE_URL: ${VITE_ZAR_BASE_URL:-http://localhost:8788}
+    ports:
+      - "5174:80"
+    depends_on:
+      - zar-backend
+
