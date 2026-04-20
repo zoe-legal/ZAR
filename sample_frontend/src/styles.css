@@ -4,9 +4,11 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #111827;
-  background: #f9fafb;
+  font-family: Georgia, "Times New Roman", serif;
+  color: #201815;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.65), transparent 35%),
+    linear-gradient(180deg, #f8f2e8 0%, #f4efe4 100%);
 }
 
 .page {
@@ -26,6 +28,28 @@ body {
   border-radius: 8px;
 }
 
+.hero {
+  width: min(90vw, 800px);
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.eyebrow {
+  margin: 0 0 18px;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f514a;
+}
+
+.hero-title {
+  margin: 0 0 32px;
+  font-size: clamp(3rem, 8vw, 5.75rem);
+  line-height: 0.95;
+  font-weight: 700;
+}
+
 p {
   margin: 0;
 }
@@ -33,15 +57,29 @@ p {
 button,
 .button {
   appearance: none;
-  border: 1px solid #111827;
-  border-radius: 6px;
-  background: #111827;
-  color: #ffffff;
-  font: inherit;
-  padding: 8px 12px;
+  border: 1px solid #201815;
+  border-radius: 999px;
+  background: #201815;
+  color: #f9f4ea;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 14px 32px;
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+button:hover,
+.button:hover {
+  background: #3a2c26;
+  transform: translateY(-1px);
+}
+
+.hero-button {
+  min-width: 132px;
 }
 
 .status {

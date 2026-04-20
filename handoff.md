@@ -6,14 +6,26 @@ Date: 2026-04-19
 
 ZAR is becoming the real authentication and onboarding boundary for Zoe. The current focus is Clerk-backed identity, webhook-driven greenfield onboarding, and containerized service boundaries. The sample frontend exists only to support Clerk login/session testing; the backend is the important artifact.
 
+The repo is now beginning to enforce a stricter boundary:
+
+- `backend/` is ZAR itself: authenticate, admit, and route
+- `onboarding/` will hold onboarding business logic that sits behind ZAR
+- `user-admin/` will hold user and org administration concerns that sit behind ZAR
+
+Those two new folders are currently placeholders. Code has not been moved yet, but the repo shape should start reflecting the architecture now instead of after the codebase has already blurred the boundary.
+
 ## Repo Shape
 
-The repo is split into two services:
+The repo currently contains these top-level areas:
 
 - `backend/`: ZAR backend service.
 - `sample_frontend/`: minimal Clerk test frontend.
+- `onboarding/`: reserved for onboarding application logic behind ZAR.
+- `user-admin/`: reserved for user/org administration logic behind ZAR.
 
-The services are intentionally separate because they will be built and deployed as separate containers. No raw deployment path should be treated as production-like from this point forward.
+`sample_frontend/` is still only a Clerk test harness, not the long-term product UI.
+
+The long-term direction is to keep ZAR narrow. It should authenticate and route requests, not absorb all downstream product behavior into the gateway itself.
 
 ## Backend
 

@@ -1,22 +1,51 @@
 services:
-  zar-backend:
-    build:
-      context: ./backend
-    ports:
-      - "8788:8788"
-    environment:
-      AWS_PROFILE: ${AWS_PROFILE:-}
-    volumes:
-      - ~/.aws:/home/node/.aws:ro
-
-  sample-frontend:
+  sample-ui:
     build:
       context: ./sample_frontend
+      dockerfile: Dockerfile
       args:
-        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
-        VITE_ZAR_BASE_URL: ${VITE_ZAR_BASE_URL:-http://localhost:8788}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+        VITE_ZAR_BASE_URL: ${VITE_ZAR_BASE_URL:-/api}
+    container_name: zar-sample-ui
     ports:
       - "5174:80"
     depends_on:
       - zar-backend
+    networks:
+      - zoe_czar
 
+  zar-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zar-backend
+    environment:
+      AWS_PROFILE: zoe-admin
+      AWS_REGION: us-west-1
+      AWS_SDK_LOAD_CONFIG: "1"
+    expose:
+      - "8788"
+    volumes:
+      - ~/.aws:/home/node/.aws:ro
+    networks:
+      - zoe_czar
+
+  onboarding-api:
+    build:
+      context: ./onboarding
+      dockerfile: Dockerfile
+    container_name: zar-onboarding-api
+    environment:
+      AWS_PROFILE: zoe-admin
+      AWS_REGION: us-west-1
+      AWS_SDK_LOAD_CONFIG: "1"
+    expose:
+      - "8790"
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    networks:
+      - zoe_czar
+
+networks:
+  zoe_czar:
+    name: zoe_czar
