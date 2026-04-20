@@ -1,4 +1,16 @@
 services:
+  edge-nginx:
+    image: nginx:1.27-alpine
+    container_name: zar-edge-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.edge.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - sample-ui
+    networks:
+      - zoe_czar
+
   sample-ui:
     build:
       context: ./sample_frontend
@@ -7,8 +19,8 @@ services:
         VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
         VITE_ZAR_BASE_URL: ${VITE_ZAR_BASE_URL:-/api}
     container_name: zar-sample-ui
-    ports:
-      - "5174:80"
+    expose:
+      - "5174"
     depends_on:
       - zar-backend
     networks:
