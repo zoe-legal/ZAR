@@ -134,14 +134,24 @@ async function main() {
             }
           );
           const body = await onboardingResponse.json() as Record<string, unknown>;
+
+          let responseEntitlements = entitlements;
+          let responseEntitlementsMs = entitlementsMs;
+          const downstreamInternalOrgId = typeof body.internal_org_id === "string" ? body.internal_org_id : null;
+          if (downstreamInternalOrgId && downstreamInternalOrgId !== identity.internal_org_id) {
+            const refreshedEntitlementsStarted = performance.now();
+            responseEntitlements = await fetchOrgEntitlements(controlPlaneDb, downstreamInternalOrgId);
+            responseEntitlementsMs = entitlementsMs + elapsedMs(refreshedEntitlementsStarted);
+          }
+
           sendJson(res, onboardingResponse.status, {
             ...body,
-            entitlements,
+            entitlements: responseEntitlements,
             fga_allowed: allowed,
             timings: {
               auth_ms: authMs,
               identity_ms: identityMs,
-              entitlements_ms: entitlementsMs,
+              entitlements_ms: responseEntitlementsMs,
               fga_ms: fgaMs,
               downstream_ms: elapsedMs(downstreamStarted),
               total_ms: elapsedMs(totalStarted),
