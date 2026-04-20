@@ -4,6 +4,7 @@ type ClerkWebhookEvent = {
   id?: string;
   type?: string;
   created_at?: number;
+  timestamp?: number;
   data?: Record<string, unknown>;
   [key: string]: unknown;
 };
@@ -27,11 +28,9 @@ export async function storeClerkWebhookEvent(
   db: OnboardingDb,
   event: ClerkWebhookEvent
 ): Promise<{ stored: boolean; userId: string | null; orgId: string | null }> {
-  const eventType = requiredString(event.type, "event.type");
-  const eventId = requiredString(event.id, "event.id");
-  const eventTime = event.created_at
-    ? new Date(event.created_at)
-    : new Date();
+  const eventType = stringOrThrow(event.type, "event.type");
+  const eventId = deriveEventId(event, eventType);
+  const eventTime = deriveEventTime(event);
   const ids = extractEventIds(event);
 
   const result = await db.query(
@@ -113,11 +112,44 @@ function extractEventIds(event: ClerkWebhookEvent): { userId: string | null; org
   };
 }
 
-function requiredString(value: unknown, name: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
+function deriveEventId(event: ClerkWebhookEvent, eventType: string): string {
+  const explicitId = stringOrNull(event.id);
+  if (explicitId) return explicitId;
+
+  const data = (event.data ?? {}) as Record<string, unknown>;
+  const membershipId = stringOrNull(data.id);
+  const ids = extractEventIds(event);
+  const timestamp = typeof event.timestamp === "number"
+    ? String(event.timestamp)
+    : typeof event.created_at === "number"
+      ? String(event.created_at)
+      : "unknown-time";
+
+  return [
+    "clerk",
+    eventType,
+    timestamp,
+    membershipId ?? ids.userId ?? "unknown-user",
+    ids.orgId ?? "unknown-org",
+  ].join(":");
+}
+
+function deriveEventTime(event: ClerkWebhookEvent): Date {
+  if (typeof event.created_at === "number") {
+    return new Date(event.created_at);
+  }
+  if (typeof event.timestamp === "number") {
+    return new Date(event.timestamp * 1000);
+  }
+  return new Date();
+}
+
+function stringOrThrow(value: unknown, name: string): string {
+  const result = stringOrNull(value);
+  if (!result) {
     throw new Error(`${name} is required`);
   }
-  return value;
+  return result;
 }
 
 function stringOrNull(value: unknown): string | null {
