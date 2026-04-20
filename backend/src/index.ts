@@ -12,6 +12,7 @@ async function main() {
   const config = await loadRuntimeConfig();
   const onboardingDb = createOnboardingDb(config.onboarding_database_url);
   const clerkWebhook = new Webhook(config.clerk_webhook_signing_secret);
+  const onboardingServiceUrl = process.env.ONBOARDING_SERVICE_URL ?? "http://localhost:8790";
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -51,6 +52,39 @@ async function main() {
             clerk_org_id: typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null,
             issuer: verifiedToken.iss,
           });
+        } catch {
+          console.warn(JSON.stringify({ event: "auth.session.invalid_token" }));
+          sendJson(res, 401, { error: "invalid_bearer_token" });
+        }
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/onboarding/internal-user-and-org") {
+        const token = bearerToken(req);
+        if (!token) {
+          sendJson(res, 401, { error: "missing_bearer_token" });
+          return;
+        }
+
+        try {
+          const verifiedToken = await verifyToken(token, {
+            secretKey: config.clerk_secret_key,
+          });
+          const clerkUserId = verifiedToken.sub;
+          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
+
+          const onboardingResponse = await fetch(
+            `${onboardingServiceUrl}/getInternalUserAndOrg`,
+            {
+              method: "GET",
+              headers: {
+                "X-Clerk-User-Id": clerkUserId,
+                ...(clerkOrgId ? { "X-Clerk-Org-Id": clerkOrgId } : {}),
+              },
+            }
+          );
+          const body = await onboardingResponse.json();
+          sendJson(res, onboardingResponse.status, body);
         } catch {
           console.warn(JSON.stringify({ event: "auth.session.invalid_token" }));
           sendJson(res, 401, { error: "invalid_bearer_token" });

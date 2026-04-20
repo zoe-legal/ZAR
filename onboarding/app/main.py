@@ -107,12 +107,17 @@ def get_existing_internal_mapping(user_id: str, org_id: str | None) -> dict[str,
             select
               orm.internal_org_id::text,
               um.internal_user_id::text,
-              orm.org_ring
+              orm.org_ring,
+              udp.property_value_text
             from zoe_czar.user_map um
             join zoe_czar.org_ring_map orm
               on orm.internal_org_id = um.internal_org_id
              and orm.external_org_id_source = um.external_org_id_source
              and orm.external_org_id = um.external_org_id
+            left join zoe_customer_details.user_properties udp
+              on udp.internal_org_id = um.internal_org_id
+             and udp.internal_user_id = um.internal_user_id
+             and udp.property_key = 'user_display_name'
             where um.external_user_id_source = %s
               and um.external_user_id = %s
               and um.external_org_id_source = %s
@@ -128,6 +133,7 @@ def get_existing_internal_mapping(user_id: str, org_id: str | None) -> dict[str,
         "internal_org_id": row[0],
         "internal_user_id": row[1],
         "org_ring": row[2],
+        "display_name": row[3],
     }
 
 
@@ -334,6 +340,7 @@ def provision_greenfield_user(user_id: str, org_id: str, event_dict: dict[str, A
         "internal_org_id": internal_org_id,
         "internal_user_id": internal_user_id,
         "org_ring": org_ring,
+        "display_name": person["display_name"],
     }
 
 
@@ -452,4 +459,3 @@ def cleaned(value: Any) -> str | None:
 
 def truthy(value: Any) -> bool:
     return value is True
-

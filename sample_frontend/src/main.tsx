@@ -14,6 +14,8 @@ import "./styles.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const zarBaseUrl = import.meta.env.VITE_ZAR_BASE_URL ?? "http://localhost:8788";
+const ONBOARDING_RETRY_DELAY_MS = 30_000;
+const ONBOARDING_MAX_RETRIES = 2;
 
 if (!publishableKey) {
   throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
@@ -93,6 +95,9 @@ function ProtectedPage() {
 function ProtectedContent() {
   const { getToken } = useAuth();
   const [status, setStatus] = useState("Checking ZAR session...");
+  const [greeting, setGreeting] = useState<string | null>(null);
+  const [internalOrgId, setInternalOrgId] = useState<string | null>(null);
+  const [internalUserId, setInternalUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +114,43 @@ function ProtectedContent() {
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "ZAR session check failed");
-        if (!cancelled) setStatus(`ZAR verified Clerk user ${body.clerk_user_id}`);
+        if (cancelled) return;
+
+        setStatus(`ZAR verified Clerk user ${body.clerk_user_id}. Starting onboarding...`);
+
+        for (let attempt = 0; attempt <= ONBOARDING_MAX_RETRIES; attempt += 1) {
+          const onboardingResponse = await fetch(`${zarBaseUrl}/onboarding/internal-user-and-org`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const onboardingBody = await onboardingResponse.json();
+
+          if (!onboardingResponse.ok) {
+            throw new Error(onboardingBody.error ?? "Onboarding request failed");
+          }
+
+          if (onboardingBody.status === "internal_user_details") {
+            if (!cancelled) {
+              setGreeting(`Hello ${onboardingBody.display_name ?? "there"}, I'm Zoe, how can I help?`);
+              setInternalUserId(onboardingBody.internal_user_id);
+              setInternalOrgId(onboardingBody.internal_org_id);
+              setStatus("Onboarding complete.");
+            }
+            return;
+          }
+
+          if (!cancelled) {
+            const attemptLabel = attempt < ONBOARDING_MAX_RETRIES
+              ? `Retrying in 30s (${attempt + 1}/${ONBOARDING_MAX_RETRIES + 1})...`
+              : "No more retries remaining.";
+            setStatus(`Onboarding ${onboardingBody.status}: ${onboardingBody.reason}. ${attemptLabel}`);
+          }
+
+          if (attempt < ONBOARDING_MAX_RETRIES) {
+            await delay(ONBOARDING_RETRY_DELAY_MS);
+          }
+        }
       } catch (error) {
         if (!cancelled) setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -124,7 +165,9 @@ function ProtectedContent() {
   return (
     <main className="page">
       <section className="panel">
-        <p>If you can see this page, you have sucessfully logged in.</p>
+        {greeting ? <p>{greeting}</p> : <p>If you can see this page, you have sucessfully logged in.</p>}
+        {internalUserId ? <p className="status">internal_user_id: {internalUserId}</p> : null}
+        {internalOrgId ? <p className="status">internal_org_id: {internalOrgId}</p> : null}
         <p className="status">{status}</p>
         <SignOutButton>
           <button type="button">Logout</button>
@@ -142,4 +185,10 @@ function NotFoundPage() {
       </section>
     </main>
   );
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
