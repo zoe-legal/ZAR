@@ -417,14 +417,7 @@ def extract_company_name(event_dict: dict[str, Any], person: dict[str, str | Non
     if org_name:
         return org_name
 
-    first_name = person.get("first_name")
-    last_name = person.get("last_name")
     display_name = person.get("display_name")
-
-    if first_name and last_name:
-        return f"{first_name} {last_name}'s Firm"
-    if first_name:
-        return f"{first_name}'s Firm"
     if display_name:
         return f"{display_name}'s Firm"
     return "My Firm"
