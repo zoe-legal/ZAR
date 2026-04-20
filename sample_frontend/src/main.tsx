@@ -236,11 +236,6 @@ function ProtectedContent() {
 
         <section className="content-pane">
           <header className="content-header">
-            {displayName ? (
-              <h1 className="content-title">Hello {displayName}, I&apos;m Zoe, how can I help?</h1>
-            ) : (
-              <h1 className="content-title">If you can see this page, you have sucessfully logged in.</h1>
-            )}
             <p className="status">{status}</p>
           </header>
 

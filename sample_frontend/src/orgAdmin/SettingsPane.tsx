@@ -92,50 +92,6 @@ export function SettingsPane({ identity }: SettingsPaneProps) {
         </div>
       </section>
 
-      <section className="settings-card">
-        <div className="settings-card-header">
-          <div>
-            <h2>Primary contact</h2>
-            <p className="field-subtext">Hello {identity.displayName ?? "there"}, I&apos;m Zoe, how can I help?</p>
-          </div>
-        </div>
-
-        <div className="settings-form">
-          <div className="field-row field-row-2">
-            <label className="field">
-              <span className="field-label">Display name</span>
-              <input type="text" value={identity.displayName ?? ""} readOnly />
-            </label>
-          </div>
-
-          <div className="meta-row">
-            <span className="field-subtext field-subtext-row">
-              <span>Internal user ID: {identity.internalUserId ?? ""}</span>
-              <button
-                type="button"
-                className="copy-button"
-                onClick={() => copyValue("user", identity.internalUserId)}
-              >
-                {copiedField === "user" ? "Copied" : "Copy"}
-              </button>
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section className="settings-card">
-        <div className="settings-toggle-row">
-          <div>
-            <h2>Allow creating new API keys in default workspace</h2>
-            <p className="field-subtext">
-              Allow users to create new API keys in the default workspace. This is presentational for now.
-            </p>
-          </div>
-          <button type="button" className="toggle-button toggle-button-on" aria-label="API keys enabled">
-            <span className="toggle-thumb" />
-          </button>
-        </div>
-      </section>
     </section>
   );
 }
