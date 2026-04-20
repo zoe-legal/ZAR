@@ -20,7 +20,7 @@ body {
 
 .admin-page {
   min-height: 100vh;
-  padding: 24px;
+  padding: 0;
 }
 
 .panel {
@@ -93,99 +93,120 @@ button:hover,
 }
 
 .admin-shell {
-  min-height: calc(100vh - 48px);
+  min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  border: 1px solid #d8cfc0;
-  border-radius: 24px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  border-top: 1px solid #d7d0c5;
   overflow: hidden;
-  background: rgba(255, 251, 245, 0.9);
-  box-shadow: 0 18px 50px rgba(32, 24, 21, 0.08);
+  background: #f6f2e9;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 28px 24px;
-  background: #201815;
-  color: #f9f4ea;
+  gap: 20px;
+  padding: 20px 16px;
+  background: #1d1714;
+  color: #f4ede3;
+  border-right: 1px solid #342a25;
+  font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
 .sidebar .eyebrow {
-  color: #d9ccbc;
+  color: #9f9186;
+  font-size: 0.75rem;
 }
 
 .sidebar-title {
   margin: 0;
-  font-size: 2rem;
-  line-height: 1.05;
+  font-size: 1rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-nav {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .nav-item {
   width: 100%;
   text-align: left;
-  border-radius: 14px;
+  border-radius: 0;
   background: transparent;
-  color: #f9f4ea;
-  border: 1px solid rgba(249, 244, 234, 0.16);
-  padding: 14px 16px;
-  font-size: 0.98rem;
+  color: #d8cdc0;
+  border: 1px solid transparent;
+  padding: 10px 12px;
+  font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   transform: none;
 }
 
 .nav-item:hover {
-  background: rgba(249, 244, 234, 0.08);
+  background: rgba(244, 237, 227, 0.06);
+  border-color: #342a25;
   transform: none;
 }
 
 .nav-item-active {
-  background: #f9f4ea;
-  color: #201815;
-  border-color: #f9f4ea;
+  background: #f6f2e9;
+  color: #1d1714;
+  border-color: #d7d0c5;
 }
 
 .sidebar-footer {
   margin-top: auto;
 }
 
+.sidebar-footer button {
+  width: 100%;
+  border-radius: 0;
+  padding: 10px 12px;
+  background: transparent;
+  color: #d8cdc0;
+  border: 1px solid #342a25;
+}
+
+.sidebar-footer button:hover {
+  background: rgba(244, 237, 227, 0.06);
+}
+
 .content-pane {
   display: grid;
-  gap: 24px;
+  gap: 20px;
   align-content: start;
-  padding: 36px;
+  padding: 28px 32px;
+  font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
 .content-header {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .content-title {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.2rem);
-  line-height: 1;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 
 .settings-panel {
   display: grid;
-  gap: 20px;
+  gap: 12px;
 }
 
 .settings-section {
   display: grid;
-  gap: 20px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid #e5dbcb;
-  border-radius: 20px;
+  gap: 18px;
+  padding: 18px;
+  background: #f8f5ee;
+  border: 1px solid #ddd5ca;
+  border-radius: 0;
 }
 
 .section-heading {
@@ -197,18 +218,21 @@ button:hover,
 
 .section-heading h2 {
   margin: 0;
-  font-size: 1.6rem;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .section-pill {
   display: inline-flex;
   align-items: center;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: #efe5d6;
+  padding: 5px 8px;
+  border-radius: 0;
+  background: #ece5d8;
   color: #5f514a;
   font-family: "Helvetica Neue", Arial, sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -238,14 +262,28 @@ button:hover,
   color: #5f514a;
 }
 
+.field-subtext {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.76rem;
+  color: #7b6d61;
+  letter-spacing: 0.01em;
+}
+
 .field input {
   width: 100%;
-  padding: 14px 16px;
-  border: 1px solid #d9ccbc;
-  border-radius: 14px;
-  background: #fffdf8;
+  padding: 12px 14px;
+  border: 1px solid #d7d0c5;
+  border-radius: 0;
+  background: #fbf8f2;
   color: #201815;
   font: inherit;
+  font-size: 0.95rem;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #8c7b6b;
+  background: #fffdf9;
 }
 
 @media (max-width: 900px) {

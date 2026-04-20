@@ -140,7 +140,7 @@ function ProtectedContent() {
               setDisplayName(onboardingBody.display_name ?? "there");
               setInternalUserId(onboardingBody.internal_user_id);
               setInternalOrgId(onboardingBody.internal_org_id);
-              setStatus("Onboarding complete.");
+              setStatus("");
             }
             return;
           }
@@ -210,7 +210,6 @@ function ProtectedContent() {
 
         <section className="content-pane">
           <header className="content-header">
-            <p className="eyebrow">Protected</p>
             {displayName ? (
               <h1 className="content-title">Hello {displayName}, I&apos;m Zoe, how can I help?</h1>
             ) : (

@@ -18,14 +18,11 @@ export function SettingsPane({ identity }: SettingsPaneProps) {
           <label className="field">
             <span className="field-label">Org Name</span>
             <input type="text" value={orgName} readOnly />
+            <span className="field-subtext">internal_org_id: {identity.internalOrgId ?? ""}</span>
           </label>
           <label className="field">
             <span className="field-label">Display Name</span>
             <input type="text" value={orgName} readOnly />
-          </label>
-          <label className="field field-full">
-            <span className="field-label">Internal Org ID</span>
-            <input type="text" value={identity.internalOrgId ?? ""} readOnly />
           </label>
         </div>
       </div>
@@ -39,10 +36,7 @@ export function SettingsPane({ identity }: SettingsPaneProps) {
           <label className="field">
             <span className="field-label">Display Name</span>
             <input type="text" value={identity.displayName ?? ""} readOnly />
-          </label>
-          <label className="field">
-            <span className="field-label">Internal User ID</span>
-            <input type="text" value={identity.internalUserId ?? ""} readOnly />
+            <span className="field-subtext">internal_user_id: {identity.internalUserId ?? ""}</span>
           </label>
         </div>
       </div>
