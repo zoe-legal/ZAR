@@ -10,6 +10,10 @@ import {
   SignOutButton,
   useAuth,
 } from "@clerk/clerk-react";
+import { SettingsPane } from "./orgAdmin/SettingsPane";
+import type { OrgAdminPane } from "./orgAdmin/types";
+import { YouPane } from "./orgAdmin/YouPane";
+import { UsersRolesPane } from "./orgAdmin/UsersRolesPane";
 import "./styles.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -95,9 +99,10 @@ function ProtectedPage() {
 function ProtectedContent() {
   const { getToken } = useAuth();
   const [status, setStatus] = useState("Checking ZAR session...");
-  const [greeting, setGreeting] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [internalOrgId, setInternalOrgId] = useState<string | null>(null);
   const [internalUserId, setInternalUserId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<OrgAdminPane>("settings");
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +137,7 @@ function ProtectedContent() {
 
           if (onboardingBody.status === "internal_user_details") {
             if (!cancelled) {
-              setGreeting(`Hello ${onboardingBody.display_name ?? "there"}, I'm Zoe, how can I help?`);
+              setDisplayName(onboardingBody.display_name ?? "there");
               setInternalUserId(onboardingBody.internal_user_id);
               setInternalOrgId(onboardingBody.internal_org_id);
               setStatus("Onboarding complete.");
@@ -162,16 +167,62 @@ function ProtectedContent() {
     };
   }, [getToken]);
 
+  const orgName = displayName ? `${displayName}'s Firm` : "";
+  const identity = { displayName, internalOrgId, internalUserId };
+
   return (
-    <main className="page">
-      <section className="panel">
-        {greeting ? <p>{greeting}</p> : <p>If you can see this page, you have sucessfully logged in.</p>}
-        {internalUserId ? <p className="status">internal_user_id: {internalUserId}</p> : null}
-        {internalOrgId ? <p className="status">internal_org_id: {internalOrgId}</p> : null}
-        <p className="status">{status}</p>
-        <SignOutButton>
-          <button type="button">Logout</button>
-        </SignOutButton>
+    <main className="admin-page">
+      <section className="admin-shell">
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <p className="eyebrow">Org Admin</p>
+            <h2 className="sidebar-title">Sue, Grabbit, and Runne</h2>
+          </div>
+          <nav className="sidebar-nav">
+            <button
+              type="button"
+              className={activeSection === "you" ? "nav-item nav-item-active" : "nav-item"}
+              onClick={() => setActiveSection("you")}
+            >
+              You
+            </button>
+            <button
+              type="button"
+              className={activeSection === "users_roles" ? "nav-item nav-item-active" : "nav-item"}
+              onClick={() => setActiveSection("users_roles")}
+            >
+              Users &amp; Roles
+            </button>
+            <button
+              type="button"
+              className={activeSection === "settings" ? "nav-item nav-item-active" : "nav-item"}
+              onClick={() => setActiveSection("settings")}
+            >
+              Settings
+            </button>
+          </nav>
+          <div className="sidebar-footer">
+            <SignOutButton>
+              <button type="button">Logout</button>
+            </SignOutButton>
+          </div>
+        </aside>
+
+        <section className="content-pane">
+          <header className="content-header">
+            <p className="eyebrow">Protected</p>
+            {displayName ? (
+              <h1 className="content-title">Hello {displayName}, I&apos;m Zoe, how can I help?</h1>
+            ) : (
+              <h1 className="content-title">If you can see this page, you have sucessfully logged in.</h1>
+            )}
+            <p className="status">{status}</p>
+          </header>
+
+          {activeSection === "settings" ? <SettingsPane identity={identity} /> : null}
+          {activeSection === "you" ? <YouPane /> : null}
+          {activeSection === "users_roles" ? <UsersRolesPane /> : null}
+        </section>
       </section>
     </main>
   );
