@@ -313,6 +313,7 @@ def provision_greenfield_user(user_id: str, org_id: str, event_dict: dict[str, A
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_last_name", person["last_name"])
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_display_name", person["display_name"])
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_email", person["email"])
+            grant_all_org_entitlements(conn, internal_org_id)
 
     with onboarding_connection() as conn:
         with conn.transaction():
@@ -342,6 +343,99 @@ def provision_greenfield_user(user_id: str, org_id: str, event_dict: dict[str, A
         "org_ring": org_ring,
         "display_name": person["display_name"],
     }
+
+
+def grant_all_org_entitlements(conn: Any, internal_org_id: str) -> None:
+    entitlement_rows = conn.execute(
+        """
+        select entitlement_key
+        from zoe_entitlements.entitlements_def
+        order by entitlement_key asc
+        """
+    ).fetchall()
+
+    if not entitlement_rows:
+        return
+
+    existing_rows = conn.execute(
+        """
+        select
+          entitlement_key,
+          current_status,
+          available_until_date
+        from zoe_entitlements.org_entitlements
+        where internal_org_id = %s::uuid
+        """,
+        (internal_org_id,),
+    ).fetchall()
+    existing_by_key = {
+        row[0]: {
+            "current_status": row[1],
+            "available_until_date": row[2],
+        }
+        for row in existing_rows
+    }
+
+    for entitlement_row in entitlement_rows:
+        entitlement_key = entitlement_row[0]
+        previous = existing_by_key.get(entitlement_key)
+
+        if previous and previous["current_status"] == "active" and previous["available_until_date"] is None:
+            continue
+
+        conn.execute(
+            """
+            insert into zoe_entitlements.org_entitlements (
+              internal_org_id,
+              entitlement_key,
+              available_until_date,
+              current_status
+            )
+            values (%s::uuid, %s, null, 'active')
+            on conflict (internal_org_id, entitlement_key)
+            do update set
+              available_until_date = null,
+              current_status = 'active',
+              last_change_date = now()
+            """,
+            (internal_org_id, entitlement_key),
+        )
+
+        conn.execute(
+            """
+            insert into zoe_entitlements.entitlement_changes (
+              internal_org_id,
+              entitlement_key,
+              change_type,
+              previous_status,
+              new_status,
+              previous_available_until_date,
+              new_available_until_date,
+              actor_type,
+              actor_id,
+              change_reason
+            )
+            values (
+              %s::uuid,
+              %s,
+              %s,
+              %s,
+              'active',
+              %s,
+              null,
+              'system',
+              'greenfield_onboarding',
+              'greenfield onboarding default entitlement grant'
+            )
+            """,
+            (
+                internal_org_id,
+                entitlement_key,
+                derive_entitlement_change_type(previous),
+                previous["current_status"] if previous else None,
+                previous["available_until_date"] if previous else None,
+            ),
+        )
 
 
 def upsert_company_property(conn: Any, internal_org_id: str, key: str, value: str | None) -> None:
@@ -391,6 +485,16 @@ def upsert_user_property(
         """,
         (internal_org_id, internal_user_id, key, value),
     )
+
+
+def derive_entitlement_change_type(previous: dict[str, Any] | None) -> str:
+    if previous is None or previous["current_status"] is None:
+        return "granted"
+    if previous["current_status"] == "paused":
+        return "resumed"
+    if previous["current_status"] in {"revoked", "expired"}:
+        return "granted"
+    return "extended"
 
 
 def extract_person_details(event_dict: dict[str, Any], fallback_user_id: str) -> dict[str, str | None]:
