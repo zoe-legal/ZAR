@@ -136,12 +136,18 @@ function deriveEventId(event: ClerkWebhookEvent, eventType: string): string {
 
 function deriveEventTime(event: ClerkWebhookEvent): Date {
   if (typeof event.created_at === "number") {
-    return new Date(event.created_at);
+    return epochToDate(event.created_at);
   }
   if (typeof event.timestamp === "number") {
-    return new Date(event.timestamp * 1000);
+    return epochToDate(event.timestamp);
   }
   return new Date();
+}
+
+function epochToDate(value: number): Date {
+  // Clerk payloads may arrive with either seconds or milliseconds.
+  // Values >= 1e12 are already millisecond epoch timestamps.
+  return new Date(value >= 1_000_000_000_000 ? value : value * 1000);
 }
 
 function stringOrThrow(value: unknown, name: string): string {
