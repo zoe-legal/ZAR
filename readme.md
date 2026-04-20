@@ -1,255 +1,262 @@
-# ZoeAuthorizedRouter
+# ZAR
 
 ## Overview
 
-The Auth Router is the single enforced entry point for all traffic in Zoe. It owns authentication, entitlement enforcement, fine-grained authorization, and transparent PHI/PII redaction, and acts as a token exchange service for all downstream communication.
+This repo currently contains three API surfaces plus a sample UI and local edge wiring:
 
-### Aims
+- `backend/` — ZAR itself
+- `onboarding/` — greenfield onboarding API
+- `user-admin/` — property-editing API
+- `sample_frontend/` — Clerk test UI and current org-admin surface
+- `docker-compose.yml` / `nginx.edge.conf` — local and dev-machine edge composition
 
-**No unauthorized agent calls.**
-Every call in the system — from any client, service, agent, or background process — must be authenticated, entitled, and authorized before it reaches any upstream. There is no path around this.
+Only `backend/` is the actual Zoe Authorized Router. `onboarding/` and `user-admin/` are temporarily co-located here for speed while the contracts settle. They are not intended to remain in this repo for real deployment.
 
-**Transparent management of PHI and PII.**
-The router is the correct layer to enforce data handling obligations for protected health information and personally identifiable information. Upstreams never see raw PHI/PII — the router redacts before forwarding and unredacts before responding. This is enforced by design, not by policy.
+## ZAR
 
----
+### Role
 
-## The Core Invariant
+ZAR is the single authenticated entry boundary. Its job is intentionally narrow:
 
-**All calls in this system — from any client, any internal service, any background worker — go through the Auth Router. There are no exceptions. No service is reachable by any other means.**
+- authenticate the caller
+- resolve internal identity
+- fetch org entitlements
+- perform fine-grained authorization checks
+- route to the correct downstream API
 
-Upstream services are origin- and key-restricted to accept requests only from the Auth Router. Any call arriving from any other source is automatically 401'd. This is enforced at the network and application layer, not by convention or trust.
+ZAR is not the home for onboarding business logic, user-admin business logic, or long-term frontend ownership.
 
----
+### Current Deployed Path
 
-## Auth Pipeline
+The current path running on `dev.zoe-legal.net` is:
 
-Every request passes through sequential checks, failing fast. On routes that require redaction, a fourth layer is added.
+1. browser or client calls the public domain
+2. ALB terminates TLS with ACM
+3. EC2 edge nginx receives the request
+4. nginx routes to:
+   - `sample-ui`
+   - `zar-backend`
+   - `zoe-onboarding-api`
+   - `zoe-user-admin-api`
+5. ZAR performs:
+   - Clerk JWT verification
+   - internal identity resolution from Zoe core
+   - org entitlement fetch from Zoe core
+   - real OpenFGA network check
+6. ZAR forwards to the appropriate downstream API
 
-**All routes:**
-1. **Authentication (Clerk)** — who is this user? → 401 if invalid
-2. **Entitlements (DB table)** — can this org use this feature? → 402 if denied
-3. **Fine-grained authorization (OpenFGA)** — can this user access this specific resource? → 403 if denied
+### Current Stack
 
-**Routes requiring redaction:**
-4. **Redaction** — strip PHI/PII from request before forwarding to upstream → 503 if redaction service unreachable
+- public entry: `dev.zoe-legal.net`
+- edge: nginx in Docker
+- auth provider: Clerk
+- entitlement store: Zoe control-plane Postgres / Neon
+- fine-grained authorization: real OpenFGA container
+- deployment target: EC2 behind ALB
 
-On response, for routes with redaction:
-- Router sends upstream response to redaction service → receives unredacted response
-- Unredacted response returned to caller
+### Current ZAR Endpoints
 
-Redaction and unredaction are always a matched pair. If a route requires redaction, unredaction always follows. There is no partial exposure.
+- `GET /health`
+- `GET /auth/session`
+- `GET /onboarding/internal-user-and-org`
+- `POST /webhooks/clerk`
 
-## Auth Router Architecture
+### Current Auth Baseline
 
-```
-Client / Internal Service / Background Worker / Agent
-                   │
-                   │  (only path in — network policy blocks everything else)
-                   ▼
-┌──────────────────────────────────────────┐
-│  Auth Router                             │
-│  1. Route match (path + method)          │
-│  2. Validate incoming credential         │
-│     (Clerk JWT, API key, etc.)           │
-│  3. Resolve user_id, org_id      → 401   │
-│  4. Entitlements check           → 402   │
-│  5. FGA check                    → 403   │
-│  6. [if route requires redaction]        │
-│     Send payload + asset context         │
-│     to redaction service         → 503   │
-│     Receive redacted payload             │
-│  7. Issue / retrieve internal token      │
-│     bound to user_id + org_id            │
-│  8. Forward (redacted) request           │
-│     with internal token                  │
-│     + X-User-Id, X-Org-Id, X-Verified:1 │
-│  9. [if route requires redaction]        │
-│     Send upstream response to            │
-│     redaction service                    │
-│     Receive unredacted response          │
-│ 10. Return response to caller            │
-└──────────────────────────────────────────┘
-                   │
-                   ▼
-         Upstream service
-    (never sees raw PHI/PII;
-     validates router-issued token only;
-     origin- and key-restricted to router;
-     all other callers → 401)
-```
+The current steady-state request path includes all major enforcement hops:
 
-## Redaction Service
+- JWT verification
+- internal identity resolution
+- entitlements fetch
+- real OpenFGA check
 
-The redaction service is a dedicated internal service that owns all PHI/PII intelligence. The router delegates to it entirely — the router knows only whether a route requires redaction, not what to redact or how.
+This is now a real measured path, not a fake placeholder pipeline. OpenFGA is currently configured permissively so the call graph is real even though the authorization semantics are intentionally relaxed for now.
 
-**Request flow:**
-- Router sends: payload + asset context (owner, unique asset ID, etc.)
-- Redaction service applies redaction, maintains a conversion table keyed on asset identity
-- Returns redacted payload to router
+### Current Timing Shape
 
-**Response flow:**
-- Router sends: upstream response + asset context
-- Redaction service looks up conversion table, restores original values
-- Returns unredacted response to router
+ZAR responses currently return timing breakdowns such as:
 
-The conversion table — mapping redacted tokens to original PHI/PII values — is the most sensitive data store in the system.
+- `auth_ms`
+- `identity_ms`
+- `entitlements_ms`
+- `fga_ms`
+- `total_ms`
 
-**Failure mode:** fail closed. If the redaction service is unreachable and the route requires redaction, the request fails with 503. No degraded mode.
+On onboarding-routed calls, responses also include:
 
-**Placement:** the redaction service sits behind the router like any other upstream — it is a trusted internal peer, not a public service.
+- `downstream_ms`
 
-## Design Decisions
+This gives a baseline for the actual router cost before optimization work.
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Protocol | HTTP only | Sufficient for current service mesh |
-| Routing | Router owns route map | Single entry point, uniform enforcement |
-| Downstream token | Router-issued, longer-lived | Decouples upstreams from Clerk; solves JWT expiry for agents and long-lived processes |
-| Internal service identity | Forward original user JWT | No separate identity layer needed at this stage |
-| FGA resource resolution | Deferred | Let the natural shape of the system emerge from real routes |
-| Redaction intelligence | Delegated to redaction service | Router stays clean; PHI/PII logic owned in one place |
-| Redaction token stability | Internal to redaction service | Router doesn't care; conversion table is the redaction service's concern |
+### Current OpenFGA State
 
----
+- real OpenFGA service in compose
+- real `/check` network hop from ZAR
+- currently permissive behavior through the model/check context
+- no attempt yet at final tuple model design
 
-## Security Risks and Mitigations
+That is deliberate. The point right now is to establish the real boundary and measure its cost before modeling gets more detailed.
 
-The router is a single point of compromise. These risks are accepted deliberately — the same tradeoff any API gateway makes — but must be mitigated actively.
+### Current Entitlement Behavior
 
-### Risks
+ZAR reads org entitlements on authenticated requests from:
 
-**Router compromise = full system compromise.**
-An attacker who controls the router can forge identities, bypass FGA, and reach any upstream. There is no second line of defence inside the perimeter.
+- `zoe_entitlements.org_entitlements`
 
-**The internal token signing key is the crown jewel.**
-If it leaks, an attacker can mint valid internal tokens and bypass the router entirely — without needing to compromise the router process. Key management is critical.
+Greenfield onboarding now grants all entitlement definitions found in:
 
-**Single ingress = high-value DoS target.**
-Take the router down and the entire system is down.
+- `zoe_entitlements.entitlements_def`
 
-**Token store breach = identity breach.**
-A compromised token store exposes all active internal tokens for all users. Longer token lifetimes increase blast radius.
+and records the corresponding audit trail in:
 
-**Pipeline bugs are system-wide.**
-A logic error in the entitlements or FGA check affects every route. There is no scope containment.
+- `zoe_entitlements.entitlement_changes`
 
-**Redaction service conversion table is the PHI/PII master store.**
-A breach of the conversion table exposes all PHI/PII for all assets. It must be treated with the same or greater care as the token signing key.
+### Clerk / Onboarding Flow
 
-### Mitigations
+The current greenfield flow is:
 
-- **Short internal token lifetimes with sliding refresh** — limits the theft window without burdening callers
-- **Token binding** — bind internal tokens to session properties to prevent replay from a different context
-- **Signing key rotation on a schedule** — old tokens invalidated on rotation
-- **Multiple router instances behind a load balancer** — eliminates the DoS single point of failure; router logic stays stateless, only the token store is stateful
-- **Rate limiting and anomaly detection at the router** — it sees all traffic; it's the right place to detect abuse
-- **Audit log every auth decision and token issuance** — full forensic trail if something goes wrong
-- **Redaction service conversion table encrypted at rest** — treat it as the most sensitive store in the system
+1. user signs up through Clerk
+2. Clerk emits `organizationMembership.created`
+3. ZAR webhook verifies and stores the event in onboarding DB
+4. onboarding service checks onboarding state and event recency
+5. onboarding writes:
+   - internal org mapping
+   - internal user mapping
+   - owner role
+   - customer properties
+   - default entitlements
+6. ZAR returns internal identity plus entitlements
 
----
+## Onboarding API
 
-## Robustness Design
+### Purpose
 
-The router sits on the critical path of every request in the system. Every dependency it calls — Clerk, FGA, the entitlements DB, the token store, the redaction service — is a potential failure point. Robustness must be designed in upfront, not retrofitted.
+`onboarding/` is the greenfield onboarding service behind ZAR.
 
-### Availability
+It currently owns:
 
-- **Stateless instances behind a load balancer** — any instance handles any request, no affinity needed. Only the token store is stateful.
-- **Health checks and automatic instance replacement** — a failed instance is removed from rotation without manual intervention.
-- **Zero-downtime deploys** — drain in-flight requests before shutdown, roll instances one at a time.
+- checking whether a Clerk user is already onboarded
+- checking whether the relevant onboarding event exists and is fresh
+- performing the full greenfield projection into Zoe core
 
-### Dependency Resilience
+### Current Endpoint
 
-- **Timeouts on every outbound call** — a slow FGA, Clerk, or redaction service response cannot hold connections open indefinitely.
-- **Circuit breakers on all dependencies** — if a dependency is degrading, stop hammering it and fail fast.
-- **Fail closed by default** — if a dependency is unreachable, deny the request. A 503 is better than an unverified request passing through.
-- **JWKS caching** — Clerk's public keys change rarely. Cache them locally so JWT verification survives a short Clerk outage.
-- **Entitlements caching with TTL** — entitlements don't change per-request. A short cache (30–60s) absorbs DB blips without meaningful staleness risk.
-- **FGA: no caching** — stale FGA cache after a tuple deletion means revocation doesn't take effect. Fail closed if FGA is unreachable.
-- **Redaction service: no caching** — conversion table state lives in the redaction service. Fail closed if unreachable.
+- `GET /getInternalUserAndOrg`
 
-### Latency Budget
+Current success response returns:
 
-The router adds latency to every request in the system. Keep it tight.
+- `internal_org_id`
+- `internal_user_id`
+- `org_ring`
+- `display_name`
 
-- JWT verification is mostly local (signature check) — negligible cost.
-- Entitlements: one DB read, cacheable — negligible with cache warm.
-- FGA check: 5–20ms — the dominant cost on non-redacted routes.
-- Redaction: two additional round trips (request redaction + response unredaction) on redacted routes — latency budget for the redaction service must be defined.
-- **Persistent connection pools** to all dependencies — no per-request connection setup overhead.
-- **Define and enforce a latency SLO** for the router itself, with a separate SLO for redacted routes.
+### Current Data Sources
 
-### Observability
+- onboarding DB:
+  - `onboarding.events`
+  - `onboarding.status`
+- control-plane DB:
+  - `zoe_czar.*`
+  - `zoe_org_level_roles.*`
+  - `zoe_customer_details.*`
+  - `zoe_entitlements.*`
 
-The router sees all traffic and makes all auth decisions. It must be the best-instrumented component in the system.
+### Temporary Repo Placement
 
-- **Structured logs for every auth decision** — credential type, identity resolved, which stage failed, latency per stage.
-- **Metrics per pipeline stage** — 401/402/403/503 rates, per-stage latency. A spike in 403s could be a bug or an attack.
-- **Distributed tracing** — trace IDs propagated through to upstreams so any request can be followed end-to-end.
-- **Alerting** on elevated error rates and latency degradation.
+`onboarding/` is being left in this repo for convenience while the end-to-end flow is being built and debugged.
 
-### Rate Limiting
+It should be moved out into its own repo once the API contract stabilizes. It is not intended to remain co-deployed here as a permanent architectural choice.
 
-The router is the correct place for rate limiting — it sees all traffic before it reaches any upstream.
+## User Admin API
 
-- Per-user and per-org limits protect upstreams from runaway agents or abuse.
-- Per-IP limits protect against credential stuffing at the auth stage.
+### Purpose
 
-### Operational
+`user-admin/` is the settings and property-management API behind ZAR.
 
-- **Hot reload of route config** — adding or changing a route requires no restart.
-- **Graceful shutdown** — finish in-flight requests before terminating.
+It currently owns:
 
----
+- fetching all user property definitions joined with caller values
+- fetching all org property definitions joined with org values
+- updating user properties
+- updating org properties, with owner verification
 
-## Route Configuration Shape
+### Current Endpoints
 
-```typescript
-type FgaConfig =
-  | { resourceIdFrom: "path"; resourceIdParam: string; relation: string; resourceType: string }
-  | { resourceIdFrom: "header"; headerName: string; relation: string; resourceType: string }
-  | { resourceIdFrom: "deferred" }  // router skips FGA, handled downstream
+- `GET /health`
+- `GET /getUserProperties`
+- `PUT /putUserProperties`
+- `GET /getOrgProperties`
+- `PUT /putOrgProperties`
 
-type RouteConfig = {
-  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" | "*";
-  path: string;               // e.g. "/documents/:id"
-  upstream: string;           // e.g. "http://documents-service:3001"
-  auth: {
-    entitlements?: string[];  // e.g. ["documents:create"]
-    fga?: FgaConfig;
-  };
-  redaction?: {
-    enabled: true;
-    assetContext: {
-      ownerFrom: "path" | "header";
-      ownerParam: string;
-      idFrom: "path" | "header";
-      idParam: string;
-    };
-  };
-};
-```
+### Current Behavior
 
-## Files to Implement
+- caller identity is forwarded from ZAR using internal IDs
+- user property routes trust caller self-scope
+- org property routes verify owner role in Zoe core
+- GET returns all defined properties with `null` for unset values
+- PUT accepts partial updates keyed by `property_key`
 
-| File | Purpose |
-|---|---|
-| `router/index.ts` | Entry point, HTTP server setup |
-| `router/config.ts` | RouteConfig type + config loader |
-| `router/routes.ts` | Route definitions (the route table) |
-| `router/handler.ts` | Path matching, upstream forwarding |
-| `router/pipeline.ts` | Sequential auth pipeline: validate → entitlements → FGA → redact → forward → unredact |
-| `router/tokens.ts` | Internal token issuance, storage, and validation |
-| `router/redaction.ts` | Redaction service client — redact request, unredact response |
-| `lib/auth/clerk.ts` | Clerk JWT verification |
-| `lib/auth/fga.ts` | OpenFGA client — check / write / delete / list |
-| `lib/entitlements/client.ts` | EntitlementsClient interface + DB implementation |
+### Temporary Repo Placement
 
-## Open / Deferred
+`user-admin/` is also being left in this repo for convenience while the API contract and screens are being built out.
 
-- Internal token storage: DB table vs. Redis — either works, fully owned by us
-- Internal token lifetime: to be decided based on use case requirements
-- FGA resource resolution strategy — decided as real routes are written
-- Redaction service latency SLO — to be defined
-- Billing provider — entitlements table works standalone; sync added later
+It should be moved into its own repo before any real deployment shape is treated as stable.
+
+## Sample UI
+
+### Current Purpose
+
+The sample UI in this repo is a working development surface, not the long-term product frontend.
+
+It currently exists to:
+
+- exercise Clerk signup and sign-in
+- exercise the ZAR public path
+- exercise onboarding
+- exercise the current org-admin surface
+- provide a fast way to validate end-to-end auth, routing, and downstream API behavior
+
+### Current State
+
+The sample UI currently acts as:
+
+- the Clerk login and signup surface
+- the first post-login org-admin surface
+- the easiest way to inspect ZAR and onboarding responses in a real browser flow
+
+It is useful for proving the workflow, but it should not be confused with the final application frontend boundary.
+
+## Edge
+
+### Current Composition
+
+`docker-compose.yml` currently brings up:
+
+- `zar-edge-nginx`
+- `zar-sample-ui`
+- `zar-backend`
+- `zoe-onboarding-api`
+- `zoe-user-admin-api`
+- `openfga`
+
+All of them run on the internal Docker network:
+
+- `zoe_czar`
+
+Public path routing is currently handled by `nginx.edge.conf`.
+
+## Important Note
+
+This repo is currently serving two different needs at once:
+
+1. building the real ZAR boundary
+2. moving quickly on adjacent downstream APIs so the full workflow can be proven
+
+That is acceptable for this development phase, but it is not the intended final repo boundary.
+
+The long-term expectation is:
+
+- ZAR stays as its own tightly scoped boundary service
+- onboarding moves to its own repo/service
+- user-admin moves to its own repo/service
+- the sample UI is replaced by the real frontend surface
