@@ -2,6 +2,8 @@ import { createServer, type IncomingMessage } from "node:http";
 import { verifyToken } from "@clerk/backend";
 import { Webhook } from "svix";
 import { loadRuntimeConfig } from "./config.js";
+import { bootstrapOpenFga, checkFgaAllowed, fetchOrgEntitlements, resolveInternalIdentity } from "./lib/authz/pipeline.js";
+import { createControlPlaneDb } from "./lib/db/controlPlaneDb.js";
 import { createOnboardingDb } from "./lib/db/onboardingDb.js";
 import {
   maybeTriggerGreenfieldOnboarding,
@@ -11,8 +13,11 @@ import {
 async function main() {
   const config = await loadRuntimeConfig();
   const onboardingDb = createOnboardingDb(config.onboarding_database_url);
+  const controlPlaneDb = createControlPlaneDb(config.control_plane_database_url);
   const clerkWebhook = new Webhook(config.clerk_webhook_signing_secret);
   const onboardingServiceUrl = process.env.ONBOARDING_SERVICE_URL ?? "http://localhost:8790";
+  const openFgaApiUrl = process.env.OPENFGA_API_URL ?? "http://localhost:8080";
+  const openFga = await bootstrapOpenFga(openFgaApiUrl);
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -42,15 +47,44 @@ async function main() {
         }
 
         try {
+          const totalStarted = performance.now();
+          const authStarted = performance.now();
           const verifiedToken = await verifyToken(token, {
             secretKey: config.clerk_secret_key,
           });
+          const authMs = elapsedMs(authStarted);
+          const clerkUserId = verifiedToken.sub;
+          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
+
+          const identityStarted = performance.now();
+          const identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
+          const identityMs = elapsedMs(identityStarted);
+
+          const entitlementsStarted = performance.now();
+          const entitlements = await fetchOrgEntitlements(controlPlaneDb, identity.internal_org_id);
+          const entitlementsMs = elapsedMs(entitlementsStarted);
+
+          const fgaStarted = performance.now();
+          const allowed = await checkFgaAllowed(openFga, identity, url.pathname, req.method);
+          const fgaMs = elapsedMs(fgaStarted);
+
           sendJson(res, 200, {
             ok: true,
-            clerk_user_id: verifiedToken.sub,
+            clerk_user_id: clerkUserId,
             clerk_session_id: verifiedToken.sid ?? null,
-            clerk_org_id: typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null,
+            clerk_org_id: clerkOrgId,
+            internal_user_id: identity.internal_user_id,
+            internal_org_id: identity.internal_org_id,
+            entitlements,
+            fga_allowed: allowed,
             issuer: verifiedToken.iss,
+            timings: {
+              auth_ms: authMs,
+              identity_ms: identityMs,
+              entitlements_ms: entitlementsMs,
+              fga_ms: fgaMs,
+              total_ms: elapsedMs(totalStarted),
+            },
           });
         } catch {
           console.warn(JSON.stringify({ event: "auth.session.invalid_token" }));
@@ -67,12 +101,28 @@ async function main() {
         }
 
         try {
+          const totalStarted = performance.now();
+          const authStarted = performance.now();
           const verifiedToken = await verifyToken(token, {
             secretKey: config.clerk_secret_key,
           });
+          const authMs = elapsedMs(authStarted);
           const clerkUserId = verifiedToken.sub;
           const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
 
+          const identityStarted = performance.now();
+          const identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
+          const identityMs = elapsedMs(identityStarted);
+
+          const entitlementsStarted = performance.now();
+          const entitlements = await fetchOrgEntitlements(controlPlaneDb, identity.internal_org_id);
+          const entitlementsMs = elapsedMs(entitlementsStarted);
+
+          const fgaStarted = performance.now();
+          const allowed = await checkFgaAllowed(openFga, identity, url.pathname, req.method);
+          const fgaMs = elapsedMs(fgaStarted);
+
+          const downstreamStarted = performance.now();
           const onboardingResponse = await fetch(
             `${onboardingServiceUrl}/getInternalUserAndOrg`,
             {
@@ -83,8 +133,20 @@ async function main() {
               },
             }
           );
-          const body = await onboardingResponse.json();
-          sendJson(res, onboardingResponse.status, body);
+          const body = await onboardingResponse.json() as Record<string, unknown>;
+          sendJson(res, onboardingResponse.status, {
+            ...body,
+            entitlements,
+            fga_allowed: allowed,
+            timings: {
+              auth_ms: authMs,
+              identity_ms: identityMs,
+              entitlements_ms: entitlementsMs,
+              fga_ms: fgaMs,
+              downstream_ms: elapsedMs(downstreamStarted),
+              total_ms: elapsedMs(totalStarted),
+            },
+          });
         } catch {
           console.warn(JSON.stringify({ event: "auth.session.invalid_token" }));
           sendJson(res, 401, { error: "invalid_bearer_token" });
@@ -150,6 +212,7 @@ async function main() {
 
   const shutdown = async () => {
     await onboardingDb.end();
+    await controlPlaneDb.end();
     server.close();
   };
   process.on("SIGINT", shutdown);
@@ -196,6 +259,10 @@ function sendJson(res: import("node:http").ServerResponse, status: number, paylo
   }
   res.setHeader("Content-Type", "application/json");
   res.end(`${JSON.stringify(payload)}\n`);
+}
+
+function elapsedMs(started: number): number {
+  return Math.round((performance.now() - started) * 100) / 100;
 }
 
 main().catch((error) => {

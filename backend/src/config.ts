@@ -15,6 +15,7 @@ export type RuntimeConfig = SecretLocatorConfig & {
   clerk_secret_key: string;
   clerk_webhook_signing_secret: string;
   onboarding_database_url: string;
+  control_plane_database_url: string;
   port: number;
 };
 
@@ -30,6 +31,13 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     clerk_webhook_signing_secret: requiredString(
       clerkSecret.clerk_webhook_signing_secret,
       "secret.clerk_webhook_signing_secret"
+    ),
+    control_plane_database_url: requiredString(
+      firstPresentString(
+        clerkSecret,
+        ["zoe_control_plane_database_url", "control_plane_database_url", "database_url"]
+      ),
+      "secret.control_plane_database_url"
     ),
     onboarding_database_url: requiredString(
       onboardingDbSecret.zar_onboarding_db_url,
@@ -72,4 +80,14 @@ function requiredString(value: unknown, name: string): string {
     throw new Error(`${name} is required`);
   }
   return value;
+}
+
+function firstPresentString(payload: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim() !== "") {
+      return value;
+    }
+  }
+  return undefined;
 }

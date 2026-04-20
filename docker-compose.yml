@@ -34,8 +34,11 @@ services:
     environment:
       AWS_REGION: us-west-1
       ONBOARDING_SERVICE_URL: http://zoe-onboarding-api:8790
+      OPENFGA_API_URL: http://openfga:8080
     expose:
       - "8788"
+    depends_on:
+      - openfga
     volumes:
       - ~/.aws:/home/node/.aws:ro
     networks:
@@ -66,6 +69,17 @@ services:
       - "8791"
     volumes:
       - ~/.aws:/root/.aws:ro
+    networks:
+      - zoe_czar
+
+  openfga:
+    image: openfga/openfga:latest
+    container_name: openfga
+    command: run
+    expose:
+      - "8080"
+      - "8081"
+      - "3000"
     networks:
       - zoe_czar
 
