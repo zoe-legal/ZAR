@@ -1,27 +1,47 @@
 # User Admin
 
-This folder is reserved for user and organization administration features that are application concerns rather than ZAR concerns.
+This folder now contains the first Python service scaffold for Zoe user and
+organization property administration.
 
-Current intent:
+Current scope:
 
-- firm/user invite flows
-- org membership management
-- role and membership administration workflows
-- user-facing or admin-facing account management endpoints and UI
+- caller-scoped user property reads and writes
+- owner-only org property reads and writes
+- all property definitions returned, even when current values are unset
+- writes are in-place updates only for now
 
-Boundary rule:
+Current stack:
 
-- `user-admin/` owns user-management product behavior
-- `backend/` remains the ZAR boundary that authenticates requests and routes them onward
-- ZAR should not become the long-term home of product UI or general account administration logic
+- FastAPI
+- psycopg
+- boto3
+- `uv`
 
-Current status:
+Identity model:
 
-- no code has been moved here yet
-- this folder exists now to make the separation visible before implementation work resumes
+- ZAR forwards `X-Internal-User-Id`
+- ZAR forwards `X-Internal-Org-Id`
+- `user-admin` trusts those for self-property targeting
+- `user-admin` still verifies org-owner status for org-property routes
 
-Expected future shape:
+Endpoints:
 
-- service code for org membership and invites
-- UI or API artifacts for administration workflows
-- tests around membership and invitation behavior
+- `GET /health`
+- `GET /getUserProperties`
+- `PUT /putUserProperties`
+- `GET /getOrgProperties`
+- `PUT /putOrgProperties`
+
+GET response shape:
+
+- object keyed by `property_key`
+- each entry includes:
+  - `property_key`
+  - `description`
+  - `value_type`
+  - `current_value`
+
+Runtime config:
+
+- checked-in `.env` stores secret names only
+- actual DB URL is fetched from AWS Secrets Manager at runtime

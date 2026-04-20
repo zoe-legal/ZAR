@@ -1,15 +1,16 @@
 import type { OrgAdminIdentity } from "./types";
 import { useState } from "react";
+import { CopyIcon } from "./icons";
 
 type SettingsPaneProps = {
   identity: OrgAdminIdentity;
 };
 
 export function SettingsPane({ identity }: SettingsPaneProps) {
-  const [copiedField, setCopiedField] = useState<"org" | "user" | null>(null);
+  const [copiedField, setCopiedField] = useState<"org" | null>(null);
   const orgName = identity.displayName ? `${identity.displayName}'s Firm` : "";
 
-  async function copyValue(kind: "org" | "user", value: string | null) {
+  async function copyValue(kind: "org", value: string | null) {
     if (!value) return;
     await navigator.clipboard.writeText(value);
     setCopiedField(kind);
@@ -23,6 +24,17 @@ export function SettingsPane({ identity }: SettingsPaneProps) {
       <section className="settings-card">
         <div className="settings-card-header">
           <h2>Organization</h2>
+          <span className="field-subtext field-subtext-row">
+            <span>{identity.internalOrgId ?? ""}</span>
+            <button
+              type="button"
+              className="copy-button"
+              onClick={() => copyValue("org", identity.internalOrgId)}
+              aria-label={copiedField === "org" ? "Copied" : "Copy organization ID"}
+            >
+              <CopyIcon style={{ width: 13, height: 13 }} />
+            </button>
+          </span>
         </div>
 
         <div className="settings-form">
@@ -69,19 +81,6 @@ export function SettingsPane({ identity }: SettingsPaneProps) {
                 <input type="text" value="" placeholder="Tax identifier" readOnly />
               </label>
             </div>
-          </div>
-
-          <div className="meta-row">
-            <span className="field-subtext field-subtext-row">
-              <span>Organization ID: {identity.internalOrgId ?? ""}</span>
-              <button
-                type="button"
-                className="copy-button"
-                onClick={() => copyValue("org", identity.internalOrgId)}
-              >
-                {copiedField === "org" ? "Copied" : "Copy"}
-              </button>
-            </span>
           </div>
 
           <div className="settings-divider" />

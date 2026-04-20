@@ -431,14 +431,15 @@ button:hover,
 }
 
 .copy-button {
-  padding: 3px 8px;
+  padding: 4px;
   border: 1px solid var(--field-border);
   border-radius: 4px;
   background: transparent;
   color: var(--field-subtext);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .copy-button:hover {
