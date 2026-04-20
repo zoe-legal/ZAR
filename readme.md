@@ -245,6 +245,164 @@ All of them run on the internal Docker network:
 
 Public path routing is currently handled by `nginx.edge.conf`.
 
+## TODOs
+
+1. Add the Invite Users to Org flow.
+2. Build the User Admin CRUD fully.
+3. Add persistent OpenFGA storage instead of the current in-memory dev setup.
+4. Replace the permissive OpenFGA model with real authorization tuples and route-level policy.
+5. Add ZAR route-to-entitlement mapping instead of returning org entitlements only as diagnostic data.
+6. Add detailed downstream timing breakdowns inside `onboarding` and `user-admin`.
+7. Add the first real write path from the UI into `user-admin`.
+8. Replace the sample UI with the real frontend boundary.
+9. Add proper error-state UX for `pending`, `failed`, `403`, and dependency failures.
+10. Add deployment separation so the co-located local compose shape is no longer the implied runtime architecture.
+
+## Greenfield Onboarding Choices
+
+### Purpose
+
+Greenfield onboarding is the first-time path for a newly created org owner. Its job is to translate Clerk-side signup and organization membership state into Zoe internal identity, role, property, and entitlement state.
+
+### Current Trigger Choice
+
+The current trigger for greenfield onboarding is:
+
+- verified Clerk `organizationMembership.created`
+- with `data.role = 'org:admin'`
+
+This event is written into `onboarding.events` by ZAR after webhook verification.
+
+### Current State Tables
+
+The current onboarding flow uses two tables in the onboarding database:
+
+- `onboarding.events`
+- `onboarding.status`
+
+They have distinct roles:
+
+- `events` answers whether the relevant trigger event has happened
+- `status` answers whether onboarding is already complete and what the current onboarding state is
+
+### Current Endpoint Contract
+
+The current onboarding API contract is centered on:
+
+- `GET /getInternalUserAndOrg`
+
+This endpoint is called after authentication and decides whether the caller is already onboarded, should be onboarded now, should remain pending, or should be treated as failed.
+
+### Decision Order
+
+The current decision order is:
+
+1. check `onboarding.status`
+2. if `is_onboarded = true`, return the existing internal identity immediately
+3. if not onboarded, inspect `onboarding.events`
+4. if the required event exists and is recent enough, perform greenfield onboarding synchronously
+5. if the required event does not exist, or is too old, return `pending` or `failed` according to recency rules
+
+### What Counts As Pending
+
+Current `pending` means:
+
+- some onboarding-related event activity exists
+- but the conditions needed to complete onboarding are not yet satisfied
+- and the latest relevant event is still within the 60-second pending window
+
+This is intended to represent “wait a bit longer, the system may still become ready.”
+
+### What Counts As Failed
+
+Current `failed` means one of:
+
+- no qualifying greenfield event exists
+- or the latest relevant event is older than 60 seconds
+
+This is intended to represent “the expected event did not arrive in time, or the state is stale enough that the frontend should stop waiting.”
+
+### What Counts As Completed
+
+Current `completed` means:
+
+- Zoe internal org and user mappings exist
+- owner role exists and is active
+- customer properties have been written
+- default org entitlements have been written
+- onboarding status has been marked complete
+
+In the current API shape, the success status returned to the client is:
+
+- `internal_user_details`
+
+with:
+
+- `internal_org_id`
+- `internal_user_id`
+- `org_ring`
+- `display_name`
+
+ZAR also includes current entitlements in the routed response.
+
+### Current Write Behavior
+
+When greenfield onboarding runs successfully, it currently writes:
+
+- `zoe_czar.org_ring_map`
+- `zoe_czar.user_map`
+- `zoe_org_level_roles.user_roles`
+- `zoe_org_level_roles.role_changes`
+- `zoe_customer_details.company_properties`
+- `zoe_customer_details.user_properties`
+- `zoe_entitlements.org_entitlements`
+- `zoe_entitlements.entitlement_changes`
+- `onboarding.status`
+
+The control-plane writes are done together in the greenfield execution path, and onboarding status is then marked complete.
+
+### Current UI Behavior
+
+The current browser flow is expected to behave like this after signup or sign-in to a new org-owner account:
+
+1. user authenticates through Clerk
+2. frontend calls ZAR
+3. ZAR authenticates the request and routes to onboarding
+4. if onboarding returns `internal_user_details`, the protected org-admin surface renders
+5. if onboarding returns `pending`, the frontend keeps waiting and retries
+6. if onboarding returns `failed`, the frontend stops retrying and shows a failure state
+
+### Current Retry Choice
+
+The current retry behavior is:
+
+- initial onboarding call immediately after auth
+- retry at 30 seconds
+- retry at 60 seconds
+- after that, stop retrying and treat the flow as failed if onboarding has still not completed
+
+The UI-level timeout one layer above ZAR is set expecting roughly 62 seconds total.
+
+### Current Protected-Page Expectation
+
+On success, the first protected page currently proves that greenfield onboarding has succeeded by rendering:
+
+- greeting using `display_name`
+- `internal_user_id`
+- `internal_org_id`
+- current org-admin shell
+
+This is a deliberate diagnostic surface for now. It proves the internal identity projection worked before the fuller CRUD screens are finished.
+
+### Current Architectural Choice
+
+The important current architectural choice is:
+
+- onboarding runs synchronously when the required event exists
+- it is not deferred to a separate worker once the deciding request has arrived
+
+That choice keeps the first end-to-end greenfield slice simple and makes the browser-visible success state directly prove that the Zoe-side projection has completed.
+
 ## Important Note
 
 This repo is currently serving two different needs at once:
