@@ -10,6 +10,7 @@ import {
   SignOutButton,
   useAuth,
 } from "@clerk/clerk-react";
+import { MoonIcon, PanelLeftIcon, SettingsIcon, ShieldUsersIcon, SunIcon, UserIcon } from "./orgAdmin/icons";
 import { SettingsPane } from "./orgAdmin/SettingsPane";
 import type { OrgAdminPane } from "./orgAdmin/types";
 import { YouPane } from "./orgAdmin/YouPane";
@@ -103,6 +104,8 @@ function ProtectedContent() {
   const [internalOrgId, setInternalOrgId] = useState<string | null>(null);
   const [internalUserId, setInternalUserId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<OrgAdminPane>("settings");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,12 +174,24 @@ function ProtectedContent() {
   const identity = { displayName, internalOrgId, internalUserId };
 
   return (
-    <main className="admin-page">
-      <section className="admin-shell">
-        <aside className="sidebar">
+    <main className={`admin-page theme-${theme}`}>
+      <section className={`admin-shell${sidebarCollapsed ? " admin-shell-collapsed" : ""}`}>
+        <aside className={`sidebar${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
           <div className="sidebar-brand">
-            <p className="eyebrow">Org Admin</p>
-            <h2 className="sidebar-title">Sue, Grabbit, and Runne</h2>
+            <button
+              type="button"
+              className="sidebar-toggle"
+              onClick={() => setSidebarCollapsed((current) => !current)}
+              aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+            >
+              <PanelLeftIcon className="nav-icon" />
+            </button>
+            {!sidebarCollapsed ? (
+              <div>
+                <p className="eyebrow">Org Admin</p>
+                <h2 className="sidebar-title">Sue, Grabbit, and Runne</h2>
+              </div>
+            ) : null}
           </div>
           <nav className="sidebar-nav">
             <button
@@ -184,24 +199,47 @@ function ProtectedContent() {
               className={activeSection === "you" ? "nav-item nav-item-active" : "nav-item"}
               onClick={() => setActiveSection("you")}
             >
-              You
+              <UserIcon className="nav-icon" />
+              {!sidebarCollapsed ? <span>You</span> : null}
             </button>
             <button
               type="button"
               className={activeSection === "users_roles" ? "nav-item nav-item-active" : "nav-item"}
               onClick={() => setActiveSection("users_roles")}
             >
-              Users &amp; Roles
+              <ShieldUsersIcon className="nav-icon" />
+              {!sidebarCollapsed ? <span>Users &amp; Roles</span> : null}
             </button>
             <button
               type="button"
               className={activeSection === "settings" ? "nav-item nav-item-active" : "nav-item"}
               onClick={() => setActiveSection("settings")}
             >
-              Settings
+              <SettingsIcon className="nav-icon" />
+              {!sidebarCollapsed ? <span>Settings</span> : null}
             </button>
           </nav>
           <div className="sidebar-footer">
+            <div className="theme-toggle" role="group" aria-label="Theme">
+              <button
+                type="button"
+                className={theme === "light" ? "theme-button theme-button-active" : "theme-button"}
+                onClick={() => setTheme("light")}
+                aria-label="Light theme"
+              >
+                <SunIcon className="nav-icon" />
+                {!sidebarCollapsed ? <span>Light</span> : null}
+              </button>
+              <button
+                type="button"
+                className={theme === "dark" ? "theme-button theme-button-active" : "theme-button"}
+                onClick={() => setTheme("dark")}
+                aria-label="Dark theme"
+              >
+                <MoonIcon className="nav-icon" />
+                {!sidebarCollapsed ? <span>Dark</span> : null}
+              </button>
+            </div>
             <SignOutButton>
               <button type="button">Logout</button>
             </SignOutButton>
