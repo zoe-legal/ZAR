@@ -12,6 +12,45 @@ This repo currently contains three API surfaces plus a sample UI and local edge 
 
 Only `backend/` is the actual Zoe Authorized Router. `onboarding/` and `user-admin/` are temporarily co-located here for speed while the contracts settle. They are not intended to remain in this repo for real deployment.
 
+## Components
+
+The current compose/deployment shape has these active components:
+
+- `zar-edge-nginx`
+  - role: edge reverse proxy on the instance
+  - host port: `80`
+  - container port: `80`
+  - routes browser traffic to the internal services
+- `zar-sample-ui`
+  - role: sample frontend for Clerk auth, onboarding validation, and current org-admin surface
+  - host port: none directly exposed in the deployed shape
+  - container ports: `80`, `5174`
+- `zar-backend`
+  - role: the actual Zoe Authorized Router boundary
+  - host port: none directly exposed
+  - container port: `8788`
+  - responsibilities: JWT verification, identity resolution, entitlement fetch, OpenFGA check, downstream routing, Clerk webhook handling
+- `zoe-onboarding-api`
+  - role: greenfield onboarding API behind ZAR
+  - host port: none directly exposed
+  - container port: `8790`
+- `zoe-user-admin-api`
+  - role: user and org property CRUD API behind ZAR
+  - host port: none directly exposed
+  - container port: `8791`
+- `openfga`
+  - role: fine-grained authorization engine
+  - host port: none directly exposed in the dev-machine/server compose shape
+  - container ports: `8080`, `8081`, `3000`
+
+The public request path is currently:
+
+1. client hits `dev.zoe-legal.net`
+2. AWS ALB terminates TLS
+3. ALB forwards to EC2 on port `80`
+4. `zar-edge-nginx` receives the request
+5. nginx routes to the appropriate internal service over the `zoe_czar` Docker network
+
 ## ZAR
 
 ### Role
