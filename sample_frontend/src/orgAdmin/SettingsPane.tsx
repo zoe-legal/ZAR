@@ -20,42 +20,122 @@ export function SettingsPane({ identity }: SettingsPaneProps) {
 
   return (
     <section className="settings-panel">
-      <div className="settings-list">
-        <label className="field field-list">
-          <span className="field-label">Org Name</span>
-          <input type="text" value={orgName} readOnly />
-          <span className="field-subtext field-subtext-row">
-            <span>internal_org_id: {identity.internalOrgId ?? ""}</span>
-            <button
-              type="button"
-              className="copy-button"
-              onClick={() => copyValue("org", identity.internalOrgId)}
-            >
-              {copiedField === "org" ? "Copied" : "Copy"}
-            </button>
-          </span>
-        </label>
+      <section className="settings-card">
+        <div className="settings-card-header">
+          <h2>Organization</h2>
+        </div>
 
-        <label className="field field-list">
-          <span className="field-label">Display Name</span>
-          <input type="text" value={orgName} readOnly />
-        </label>
+        <div className="settings-form">
+          <label className="field">
+            <span className="field-label">Organization name</span>
+            <input type="text" value={orgName} readOnly />
+          </label>
 
-        <label className="field field-list">
-          <span className="field-label">Primary Contact</span>
-          <input type="text" value={identity.displayName ?? ""} readOnly />
-          <span className="field-subtext field-subtext-row">
-            <span>internal_user_id: {identity.internalUserId ?? ""}</span>
-            <button
-              type="button"
-              className="copy-button"
-              onClick={() => copyValue("user", identity.internalUserId)}
-            >
-              {copiedField === "user" ? "Copied" : "Copy"}
-            </button>
-          </span>
-        </label>
-      </div>
+          <div className="form-group">
+            <span className="field-group-label">Primary business address</span>
+            <div className="field-row field-row-2">
+              <label className="field">
+                <input type="text" value="" placeholder="Address line 1" readOnly />
+              </label>
+              <label className="field">
+                <input type="text" value="" placeholder="Address line 2" readOnly />
+              </label>
+            </div>
+            <div className="field-row field-row-4">
+              <label className="field">
+                <span className="field-label">Country</span>
+                <input type="text" value="" placeholder="Country" readOnly />
+              </label>
+              <label className="field">
+                <span className="field-label">State or province</span>
+                <input type="text" value="" placeholder="State or province" readOnly />
+              </label>
+              <label className="field field-span-2">
+                <span className="field-label">City</span>
+                <input type="text" value="" placeholder="City" readOnly />
+              </label>
+              <label className="field">
+                <span className="field-label">Postal code</span>
+                <input type="text" value="" placeholder="Postal code" readOnly />
+              </label>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <span className="field-group-label">Business tax ID</span>
+            <div className="field-row field-row-2">
+              <label className="field">
+                <span className="field-label">Tax identifier</span>
+                <input type="text" value="" placeholder="Tax identifier" readOnly />
+              </label>
+            </div>
+          </div>
+
+          <div className="meta-row">
+            <span className="field-subtext field-subtext-row">
+              <span>Organization ID: {identity.internalOrgId ?? ""}</span>
+              <button
+                type="button"
+                className="copy-button"
+                onClick={() => copyValue("org", identity.internalOrgId)}
+              >
+                {copiedField === "org" ? "Copied" : "Copy"}
+              </button>
+            </span>
+          </div>
+
+          <div className="settings-divider" />
+
+          <div className="settings-actions">
+            <button type="button" className="danger-button">Delete organization</button>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-card-header">
+          <div>
+            <h2>Primary contact</h2>
+            <p className="field-subtext">Hello {identity.displayName ?? "there"}, I&apos;m Zoe, how can I help?</p>
+          </div>
+        </div>
+
+        <div className="settings-form">
+          <div className="field-row field-row-2">
+            <label className="field">
+              <span className="field-label">Display name</span>
+              <input type="text" value={identity.displayName ?? ""} readOnly />
+            </label>
+          </div>
+
+          <div className="meta-row">
+            <span className="field-subtext field-subtext-row">
+              <span>Internal user ID: {identity.internalUserId ?? ""}</span>
+              <button
+                type="button"
+                className="copy-button"
+                onClick={() => copyValue("user", identity.internalUserId)}
+              >
+                {copiedField === "user" ? "Copied" : "Copy"}
+              </button>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-toggle-row">
+          <div>
+            <h2>Allow creating new API keys in default workspace</h2>
+            <p className="field-subtext">
+              Allow users to create new API keys in the default workspace. This is presentational for now.
+            </p>
+          </div>
+          <button type="button" className="toggle-button toggle-button-on" aria-label="API keys enabled">
+            <span className="toggle-thumb" />
+          </button>
+        </div>
+      </section>
     </section>
   );
 }

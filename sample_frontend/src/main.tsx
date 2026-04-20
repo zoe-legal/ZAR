@@ -170,7 +170,6 @@ function ProtectedContent() {
     };
   }, [getToken]);
 
-  const orgName = displayName ? `${displayName}'s Firm` : "";
   const identity = { displayName, internalOrgId, internalUserId };
 
   return (
@@ -220,26 +219,15 @@ function ProtectedContent() {
             </button>
           </nav>
           <div className="sidebar-footer">
-            <div className="theme-toggle" role="group" aria-label="Theme">
-              <button
-                type="button"
-                className={theme === "light" ? "theme-button theme-button-active" : "theme-button"}
-                onClick={() => setTheme("light")}
-                aria-label="Light theme"
-              >
-                <SunIcon className="nav-icon" />
-                {!sidebarCollapsed ? <span>Light</span> : null}
-              </button>
-              <button
-                type="button"
-                className={theme === "dark" ? "theme-button theme-button-active" : "theme-button"}
-                onClick={() => setTheme("dark")}
-                aria-label="Dark theme"
-              >
-                <MoonIcon className="nav-icon" />
-                {!sidebarCollapsed ? <span>Dark</span> : null}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="theme-button"
+              onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+              aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+            >
+              {theme === "light" ? <MoonIcon className="nav-icon" /> : <SunIcon className="nav-icon" />}
+              {!sidebarCollapsed ? <span>{theme === "light" ? "Dark" : "Light"}</span> : null}
+            </button>
             <SignOutButton>
               <button type="button">Logout</button>
             </SignOutButton>
