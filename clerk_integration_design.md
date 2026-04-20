@@ -1,227 +1,263 @@
 # Clerk Integration Design
 
-Date: 2026-04-19
+Date: 2026-04-20
 
-This document captures the planned Clerk integration flows for Zoe identity
-onboarding and org membership. It is intentionally incremental: each flow should
-be designed and implemented separately so the identity boundary stays clear.
+## Purpose
+
+This document captures the current chosen Clerk integration shape for ZAR and the APIs behind it.
+
+It is no longer a speculative greenfield-only design note. It should describe the actual boundary choices we are using now:
+
+- Clerk is the external identity provider
+- ZAR is the authenticated boundary
+- onboarding is a downstream API behind ZAR
+- user-admin is a downstream API behind ZAR
 
 ## Current Position
 
-Clerk is the external identity provider. Zoe keeps its own internal identity and
-authorization model.
+Clerk proves external identity. Zoe continues to own:
 
-The first Clerk configuration is intentionally minimal:
+- internal user identity
+- internal org identity
+- org-scoped roles
+- entitlements
+- fine-grained authorization
 
-- username sign-up/sign-in
-- password authentication
-- no email verification requirement
+The current external-to-internal mapping rule is:
+
+- Clerk org ID maps to `zoe_czar.org_ring_map.external_org_id`
+- Clerk user ID maps to `zoe_czar.user_map.external_user_id`
+- `external_org_id_source = 'clerk'`
+- `external_user_id_source = 'clerk'`
+
+Zoe generates and owns:
+
+- `internal_org_id`
+- `internal_user_id`
+
+## Boundary Choice
+
+The current boundary split is:
+
+- Clerk handles signup, sign-in, session management, and webhook emission
+- ZAR authenticates requests and routes them
+- onboarding performs Zoe-side greenfield projection
+- user-admin performs Zoe-side property CRUD
+
+ZAR is intentionally not absorbing the onboarding or user-admin business logic.
+
+## Current Clerk Configuration
+
+The current Clerk setup is intentionally narrow:
+
+- username/password sign-up and sign-in
+- no required email verification in the initial flow
 - no social login
-- no phone auth
+- no phone authentication
 - no MFA
 
-Email-based authentication and email verification will be added later after the
-email integration exists.
+This is a deliberate first slice. The point is to get identity, routing, onboarding, and downstream APIs working before broadening the auth product surface.
 
-The initial mapping rule is:
+## Known Clerk Flows
 
-- Clerk organization ID maps to `zoe_czar.org_ring_map.external_org_id`.
-- Clerk user ID maps to `zoe_czar.user_map.external_user_id`.
-- `external_org_id_source = 'clerk'`.
-- `external_user_id_source = 'clerk'`.
-- Zoe generates and owns `internal_org_id` and `internal_user_id`.
+The known Clerk-related flows are:
 
-Clerk authentication proves who the user is. Zoe authorization remains Zoe-owned
-through internal IDs, org-level roles, entitlements, and later ZAR/OpenFGA checks.
+1. Greenfield signup
+2. Returning user sign-in
+3. Invite user into existing org
+4. Customer-facing invite flow later
 
-## Planned Flows
+Only flows 1 and 2 have been materially exercised so far. Invite flows are still TODO work.
 
-The known Clerk integration flows are:
+## Greenfield Signup
 
-1. Greenfield signup: a new user signs up and gets a new org automatically.
-2. Returning user: an existing user returns and uses an existing org membership.
-3. Firm invite: a user invites another firm-side user into their org.
-4. Customer invite: a user invites their customer into the org to share data,
-   using the `client_customer` role.
+### Current Trigger Choice
 
-Only flow 1 is specified here. The remaining flows are intentionally deferred.
+The current greenfield trigger is:
 
-## Flow 1: Greenfield Signup
+- verified Clerk `organizationMembership.created`
+- with `data.role = 'org:admin'`
 
-### Scenario
+This event is processed by ZAR after webhook signature verification.
 
-A new user signs up for Zoe for the first time. They did not arrive through an
-invite. No Zoe user mapping or Zoe org mapping exists yet.
+### Why This Trigger Was Chosen
 
-For now, signup automatically creates a Clerk org for that user. There is no
-separate Zoe org creation step.
+The current design does not depend on the frontend directly constructing the full Zoe-side onboarding projection.
 
-### Desired Result
+Instead:
 
-After signup, Zoe should have:
+- Clerk webhook delivery creates the durable event record
+- onboarding uses that event to decide whether it can complete greenfield onboarding
+- the browser-visible protected flow keeps retrying while onboarding is still plausibly in flight
 
-- one org mapping for the Clerk org
-- one user mapping for the Clerk user inside that org
-- one active org-level role assigning the user as `owner`
-- initial org display properties
-- initial user profile properties copied from Clerk
-- one role audit row for the owner assignment
+This makes the webhook path the authoritative trigger for greenfield completion, with the browser path acting as the synchronizing request path.
 
-### Flow Shape
+## Current Webhook Handling
 
-The preferred greenfield path is app-driven after Clerk signup completes:
+ZAR currently exposes:
 
-1. User completes Clerk signup.
-2. The app ensures there is a default Clerk organization for the user.
-3. The app receives or selects that Clerk org as the user's active org.
-4. The app calls Zoe's greenfield onboarding endpoint with the Clerk-authenticated
-   user and org context.
-5. Zoe verifies the Clerk identity and verifies that the user owns/administers
-   the Clerk org.
-6. Zoe performs one idempotent database transaction to create the Zoe projection.
+- `POST /webhooks/clerk`
 
-Clerk webhooks may still be useful as reconciliation/backstop later, but they are
-not the primary greenfield signup path.
+The current webhook path does:
 
-### Implementation Placement
+1. receive the Clerk webhook
+2. verify Svix signature
+3. store every verified event into `onboarding.events`
+4. treat `organizationMembership.created` with `role = 'org:admin'` as the greenfield event of interest
+5. upsert `onboarding.status` as needed
 
-The first working implementation may live in `admin-console/server.ts` as a
-bootstrap/prototype endpoint because that server already has control-plane
-database access and schema bindings.
+The webhook path is now live and writing successfully to the onboarding database.
 
-This is not the final application boundary. In the production architecture, this
-flow should be handled by Zoe Authorized Router (ZAR) or by a service reachable
-only through ZAR. ZAR remains the long-term owner of authentication, identity
-resolution, entitlement checks, and protected route admission.
+## Current Greenfield Decision Flow
 
-### Atomicity Rule
+After auth, the protected flow calls ZAR, and ZAR routes to onboarding.
 
-Zoe cannot make Clerk's external user/org creation and Zoe's database writes one
-distributed transaction.
+The current onboarding decision sequence is:
 
-Zoe can and should make the Zoe-side projection atomic:
+1. check `onboarding.status`
+2. if the user is already onboarded, return existing internal identity
+3. if not onboarded, inspect `onboarding.events`
+4. if the qualifying Clerk event exists and is recent enough, run greenfield onboarding synchronously
+5. if the qualifying event is missing or stale, return `pending` or `failed`
 
-- `org_ring_map`
-- `user_map`
-- `user_roles`
-- `role_changes`
-- `company_properties`
-- `user_properties`
+### Current Pending Rule
 
-All Zoe-side writes for this flow should succeed or fail together.
+Current `pending` means:
 
-The operation must also be idempotent. If the frontend retries after a timeout,
-Zoe should return the existing mapping rather than creating duplicates.
+- relevant onboarding activity exists
+- but the full conditions for completion are not yet satisfied
+- and the latest relevant event is still within the 60-second pending window
 
-### Org Mapping
+### Current Failed Rule
 
-For greenfield signup:
+Current `failed` means:
 
-- `external_org_id_source = 'clerk'`
-- `external_org_id = clerk_org_id`
-- `org_ring = 4`
+- no qualifying greenfield event exists
+- or the latest relevant event is older than 60 seconds
 
-Ring 4 is the default production ring for now.
+### Current Success Rule
 
-### User Mapping
+Current success means onboarding returns:
 
-For greenfield signup:
+- `status = internal_user_details`
+- `internal_org_id`
+- `internal_user_id`
+- `org_ring`
+- `display_name`
 
-- `external_user_id_source = 'clerk'`
-- `external_user_id = clerk_user_id`
-- `external_org_id_source = 'clerk'`
-- `external_org_id = clerk_org_id`
-- `internal_org_id` comes from the Zoe org mapping created or found above
+ZAR then includes entitlements and timing breakdowns in the routed response.
 
-### Owner Role
+## Current Greenfield Writes
 
-The signing user is assigned:
+When greenfield onboarding runs successfully, the current Zoe-side projection writes:
 
-- `role_key = 'owner'`
-- `current_status = 'active'`
+- `zoe_czar.org_ring_map`
+- `zoe_czar.user_map`
+- `zoe_org_level_roles.user_roles`
+- `zoe_org_level_roles.role_changes`
+- `zoe_customer_details.company_properties`
+- `zoe_customer_details.user_properties`
+- `zoe_entitlements.org_entitlements`
+- `zoe_entitlements.entitlement_changes`
+- `onboarding.status`
 
-The role assignment is org-scoped and lives in
-`zoe_org_level_roles.user_roles`.
+The intended result is:
 
-### Role Audit
+- one internal org
+- one internal user
+- one active owner role
+- initial org properties
+- initial user properties
+- full default entitlement set
+- completed onboarding status
 
-The initial owner assignment should create a role audit row:
+## Current Org Naming Choice
 
-- `change_type = 'assigned'`
-- `previous_role_key = null`
-- `new_role_key = 'owner'`
-- `previous_status = null`
-- `new_status = 'active'`
-- `actor_type = 'system'`
-- `actor_id = 'greenfield_onboarding'`
-- `change_reason = 'greenfield signup owner assignment'`
+The current org property behavior is:
 
-On an idempotent retry where the user already has active owner status, Zoe should
-not create duplicate audit rows.
+- if Clerk sends `organization.name`, use that
+- otherwise fall back to a Zoe-owned synthetic firm name
 
-### Org Properties
+The current intent is to keep the “firm” concept as a Zoe-side construct for now rather than treating Clerk org naming as the full long-term source of truth.
 
-The default org name comes from the user's name, then username:
+## Current User Property Choice
 
-- full name present: `{First Last}'s Firm`
-- first name only: `{First}'s Firm`
-- username present: `{username}'s Firm`
-- no usable name: `My Firm`
-
-For greenfield signup, Zoe stores:
-
-- `company_name = default org name`
-- `company_display_name = default org name`
-
-These company properties should be created only if missing during onboarding
-retries. This protects a Zoe-side org rename from being overwritten by a retry.
-
-### User Properties
-
-Zoe stores initial user properties directly from Clerk:
+The current initial user properties copied from Clerk are:
 
 - `user_first_name`
 - `user_last_name`
 - `user_display_name`
-- `user_email`, when available
+- `user_email`, when the identifier is an email
 
-Email is optional in the first username/password-only Clerk setup. The greenfield
-flow must not require email until email-based authentication is enabled.
+The event payload is not being treated as a rich business profile source. It is being used only for the fields that are clearly useful right now.
 
-During onboarding retries, user properties may be updated from Clerk. These are
-treated as cached Clerk profile fields for now.
+## Returning User Sign-In
 
-### Security Requirements
+For a returning already-onboarded user:
 
-Before this endpoint is exposed outside local development, Zoe must verify:
+1. Clerk session token reaches ZAR
+2. ZAR verifies JWT
+3. ZAR resolves internal identity
+4. ZAR reads entitlements
+5. ZAR performs OpenFGA check
+6. onboarding returns existing internal identity immediately from current mappings/status
 
-- the Clerk JWT is valid
-- the request's Clerk user ID matches the authenticated user
-- the Clerk org ID belongs to the authenticated user
-- the authenticated user is the creator/admin/owner of that Clerk org for this
-  greenfield flow
+This is now a real measured path with timing breakdowns.
 
-If any check fails, the endpoint must fail closed.
+## Current UI Behavior
 
-### Secret Management
+The current UI behavior during the protected flow is:
 
-Local development may use ignored local config such as
-`admin-console/config.json` for `clerk_secret_key`.
+1. authenticate with Clerk
+2. call ZAR
+3. ZAR routes to onboarding
+4. if onboarding succeeds, render the protected/org-admin surface
+5. if onboarding is pending, keep retrying
+6. if onboarding fails after the retry window, stop and show failure
 
-Production must not load Clerk secrets from committed files or manually managed
-local config. Zoe should load Clerk backend credentials from AWS Secrets Manager
-or an equivalent managed secret store. This matches the broader security
-principle in `zoe_security_design_overview.md`: no hardcoded credentials, and
-credentials should be distributed through a controlled secret-management path.
+The current retry pattern is:
 
-### Deferred Questions
+- initial call immediately
+- retry at 30 seconds
+- retry at 60 seconds
+- fail after that if onboarding still has not completed
 
-These are intentionally not decided in this flow:
+## Security Requirements
 
-- returning user request resolution
-- ZAR active-org behavior
-- invite acceptance behavior
-- customer invite behavior
-- Clerk webhook reconciliation details
-- profile sync outside onboarding
-- org rename sync between Clerk and Zoe
+The current design assumes:
+
+- Clerk JWT must be valid
+- webhook signature must be valid
+- ZAR is the only admitted application boundary
+- internal identity is resolved inside Zoe, not trusted from the browser
+- entitlements remain Zoe-owned
+- fine-grained authorization remains Zoe-owned through OpenFGA
+
+The browser does not get to choose internal IDs. It only carries Clerk-authenticated context.
+
+## Secrets And Runtime Config
+
+The current runtime secret-management path is:
+
+- committed config files contain secret locators and non-secret config
+- AWS Secrets Manager contains sensitive runtime values
+
+Current sensitive values include:
+
+- Clerk secret key
+- Clerk webhook signing secret
+- control-plane database URL
+- onboarding database URL
+
+This is already live in the current dev activation path.
+
+## Open Questions / Deferred Work
+
+These are still deliberately open:
+
+- invite-user-to-org flow
+- customer invite flow
+- final OpenFGA model and tuples
+- whether and how Clerk profile/org changes should sync after onboarding
+- how much of the current sample UI remains as a long-term frontend concern
+- when `onboarding` and `user-admin` move into their own repos and deployment units
