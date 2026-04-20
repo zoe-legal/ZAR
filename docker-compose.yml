@@ -32,9 +32,7 @@ services:
       dockerfile: Dockerfile
     container_name: zar-backend
     environment:
-      AWS_PROFILE: zoe-admin
       AWS_REGION: us-west-1
-      AWS_SDK_LOAD_CONFIG: "1"
       ONBOARDING_SERVICE_URL: http://zoe-onboarding-api:8790
     expose:
       - "8788"
@@ -49,9 +47,7 @@ services:
       dockerfile: Dockerfile
     container_name: zoe-onboarding-api
     environment:
-      AWS_PROFILE: zoe-admin
       AWS_REGION: us-west-1
-      AWS_SDK_LOAD_CONFIG: "1"
     expose:
       - "8790"
     volumes:
