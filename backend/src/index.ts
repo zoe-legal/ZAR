@@ -358,7 +358,7 @@ function sendJson(res: import("node:http").ServerResponse, status: number, paylo
   res.statusCode = status;
   res.setHeader("Access-Control-Allow-Origin", "http://localhost:5174");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
   if (status === 204) {
     res.end();
     return;

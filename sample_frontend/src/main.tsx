@@ -177,8 +177,6 @@ function ProtectedContent() {
     };
   }, [auth.getToken]);
 
-  const identity = { displayName };
-
   return (
     <main className={`admin-page theme-${theme}`}>
       <section className={`admin-shell${sidebarCollapsed ? " admin-shell-collapsed" : ""}`}>
@@ -230,7 +228,7 @@ function ProtectedContent() {
               onClick={() => setActiveSection("settings")}
             >
               <SettingsIcon className="nav-icon" />
-              {!sidebarCollapsed ? <span>Settings</span> : null}
+              {!sidebarCollapsed ? <span>Org Settings</span> : null}
             </button>
           </nav>
           <div className="sidebar-footer">
@@ -257,7 +255,7 @@ function ProtectedContent() {
           {auth.orgId ? (
             <>
               {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
-              {activeSection === "settings" ? <SettingsPane identity={identity} /> : null}
+              {activeSection === "settings" ? <SettingsPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
               {activeSection === "you" ? <YouPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
               {activeSection === "users_roles" ? <UsersRolesPane /> : null}
             </>

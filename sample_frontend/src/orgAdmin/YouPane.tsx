@@ -13,6 +13,19 @@ type PropEntry = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
+const US_TIMEZONES = [
+  { value: "America/New_York",    label: "Eastern Time (ET)" },
+  { value: "America/Chicago",     label: "Central Time (CT)" },
+  { value: "America/Denver",      label: "Mountain Time (MT)" },
+  { value: "America/Phoenix",     label: "Mountain Time – Arizona (no DST)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "America/Anchorage",   label: "Alaska Time (AKT)" },
+  { value: "America/Adak",        label: "Hawaii-Aleutian Time (HAT)" },
+  { value: "Pacific/Honolulu",    label: "Hawaii Time (no DST)" },
+  { value: "America/Puerto_Rico", label: "Atlantic Time – Puerto Rico (AT)" },
+  { value: "Pacific/Guam",        label: "Chamorro Time – Guam (ChST)" },
+];
+
 export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
   const auth = useAuth();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -80,22 +93,49 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
     }
   }
 
-  function field(key: string, label: string, opts?: { type?: string }) {
+  function fieldLabel(key: string, label: string) {
     const state = saved[key] ?? "idle";
     return (
+      <span className="field-label">
+        {label}
+        {state === "saving" && <span className="field-save-state"> · Saving…</span>}
+        {state === "saved" && <span className="field-save-state field-save-state-ok"> · Saved</span>}
+        {state === "error" && <span className="field-save-state field-save-state-err"> · Error</span>}
+      </span>
+    );
+  }
+
+  function field(key: string, label: string, opts?: { type?: string }) {
+    return (
       <label key={key} className="field">
-        <span className="field-label">
-          {label}
-          {state === "saving" && <span className="field-save-state"> · Saving…</span>}
-          {state === "saved" && <span className="field-save-state field-save-state-ok"> · Saved</span>}
-          {state === "error" && <span className="field-save-state field-save-state-err"> · Error</span>}
-        </span>
+        {fieldLabel(key, label)}
         <input
           type={opts?.type ?? "text"}
           value={values[key] ?? ""}
           onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
           onBlur={() => saveField(key, values[key] ?? "")}
         />
+      </label>
+    );
+  }
+
+  function selectField(key: string, label: string, options: { value: string; label: string }[]) {
+    return (
+      <label key={key} className="field">
+        {fieldLabel(key, label)}
+        <select
+          value={values[key] ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            setValues((prev) => ({ ...prev, [key]: v }));
+            void saveField(key, v);
+          }}
+        >
+          <option value="">— Select —</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </label>
     );
   }
@@ -156,7 +196,7 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
         <div className="settings-card-header"><h2>Preferences</h2></div>
         <div className="settings-form">
           <div className="field-row field-row-2">
-            {field("user_timezone", "Timezone")}
+            {selectField("user_timezone", "Timezone", US_TIMEZONES)}
             {field("user_locale", "Locale")}
           </div>
         </div>

@@ -411,6 +411,9 @@ button:hover,
 .settings-panel {
   display: grid;
   gap: 12px;
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .settings-card {
@@ -557,6 +560,31 @@ button:hover,
 .field input::placeholder {
   color: var(--field-subtext);
   opacity: 0.6;
+}
+
+.field select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background: var(--field-bg);
+  color: var(--section-text);
+  font: inherit;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a8f98' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 106, 210, 0.15);
 }
 
 .settings-divider {
