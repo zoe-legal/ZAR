@@ -9,6 +9,8 @@ import {
   SignUp,
   SignOutButton,
   useAuth,
+  useClerk,
+  useOrganizationList,
 } from "@clerk/clerk-react";
 import { HomeIcon, MoonIcon, PanelLeftIcon, SettingsIcon, ShieldUsersIcon, SunIcon, UserIcon } from "./orgAdmin/icons";
 import { DashboardPane } from "./orgAdmin/DashboardPane";
@@ -100,14 +102,19 @@ function ProtectedPage() {
 }
 
 function ProtectedContent() {
-  const { getToken } = useAuth();
+  const { getToken, orgId } = useAuth();
+  const { setActive } = useClerk();
+  const { userMemberships } = useOrganizationList({ userMemberships: true });
   const [status, setStatus] = useState("Checking ZAR session...");
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [internalOrgId, setInternalOrgId] = useState<string | null>(null);
-  const [internalUserId, setInternalUserId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<OrgAdminPane>("dashboard");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (orgId || !userMemberships?.data?.[0]) return;
+    void setActive({ organization: userMemberships.data[0].organization });
+  }, [orgId, userMemberships, setActive]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,8 +150,6 @@ function ProtectedContent() {
           if (onboardingBody.status === "internal_user_details") {
             if (!cancelled) {
               setDisplayName(onboardingBody.display_name ?? "there");
-              setInternalUserId(onboardingBody.internal_user_id);
-              setInternalOrgId(onboardingBody.internal_org_id);
               setStatus("");
             }
             return;
@@ -172,7 +177,7 @@ function ProtectedContent() {
     };
   }, [getToken]);
 
-  const identity = { displayName, internalOrgId, internalUserId };
+  const identity = { displayName };
 
   return (
     <main className={`admin-page theme-${theme}`}>
