@@ -10,7 +10,8 @@ import {
   SignOutButton,
   useAuth,
 } from "@clerk/clerk-react";
-import { MoonIcon, PanelLeftIcon, SettingsIcon, ShieldUsersIcon, SunIcon, UserIcon } from "./orgAdmin/icons";
+import { HomeIcon, MoonIcon, PanelLeftIcon, SettingsIcon, ShieldUsersIcon, SunIcon, UserIcon } from "./orgAdmin/icons";
+import { DashboardPane } from "./orgAdmin/DashboardPane";
 import { SettingsPane } from "./orgAdmin/SettingsPane";
 import type { OrgAdminPane } from "./orgAdmin/types";
 import { YouPane } from "./orgAdmin/YouPane";
@@ -103,7 +104,7 @@ function ProtectedContent() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [internalOrgId, setInternalOrgId] = useState<string | null>(null);
   const [internalUserId, setInternalUserId] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<OrgAdminPane>("settings");
+  const [activeSection, setActiveSection] = useState<OrgAdminPane>("dashboard");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -195,6 +196,14 @@ function ProtectedContent() {
           <nav className="sidebar-nav">
             <button
               type="button"
+              className={activeSection === "dashboard" ? "nav-item nav-item-active" : "nav-item"}
+              onClick={() => setActiveSection("dashboard")}
+            >
+              <HomeIcon className="nav-icon" />
+              {!sidebarCollapsed ? <span>Dashboard</span> : null}
+            </button>
+            <button
+              type="button"
               className={activeSection === "you" ? "nav-item nav-item-active" : "nav-item"}
               onClick={() => setActiveSection("you")}
             >
@@ -239,6 +248,7 @@ function ProtectedContent() {
             <p className="status">{status}</p>
           </header>
 
+          {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
           {activeSection === "settings" ? <SettingsPane identity={identity} /> : null}
           {activeSection === "you" ? <YouPane /> : null}
           {activeSection === "users_roles" ? <UsersRolesPane /> : null}

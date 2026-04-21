@@ -336,6 +336,14 @@ button:hover,
   letter-spacing: -0.02em;
 }
 
+.dashboard-welcome {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--section-text);
+}
+
 .settings-panel {
   display: grid;
   gap: 12px;
