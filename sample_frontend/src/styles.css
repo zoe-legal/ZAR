@@ -344,6 +344,18 @@ button:hover,
   color: var(--section-text);
 }
 
+.debug-response {
+  font-size: 0.8125rem;
+  color: var(--field-subtext);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .settings-panel {
   display: grid;
   gap: 12px;

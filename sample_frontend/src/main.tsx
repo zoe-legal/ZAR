@@ -20,6 +20,7 @@ import "./styles.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const zarBaseUrl = import.meta.env.VITE_ZAR_BASE_URL ?? "http://localhost:8788";
+const userAdminBaseUrl = import.meta.env.VITE_USER_ADMIN_BASE_URL ?? "https://dev.zoe-legal.net/api/user-admin";
 const ONBOARDING_RETRY_DELAY_MS = 30_000;
 const ONBOARDING_MAX_RETRIES = 2;
 
@@ -250,7 +251,7 @@ function ProtectedContent() {
 
           {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
           {activeSection === "settings" ? <SettingsPane identity={identity} /> : null}
-          {activeSection === "you" ? <YouPane /> : null}
+          {activeSection === "you" ? <YouPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
           {activeSection === "users_roles" ? <UsersRolesPane /> : null}
         </section>
       </section>
