@@ -135,6 +135,7 @@ async function main() {
             }
           );
           const body = await onboardingResponse.json() as Record<string, unknown>;
+          const { internal_org_id: _internalOrgId, internal_user_id: _internalUserId, ...publicBody } = body;
 
           let responseEntitlements = entitlements;
           let responseEntitlementsMs = entitlementsMs;
@@ -146,7 +147,7 @@ async function main() {
           }
 
           sendJson(res, onboardingResponse.status, {
-            ...body,
+            ...publicBody,
             entitled: responseEntitlements.length > 0,
             fga_allowed: allowed,
             timings: {
