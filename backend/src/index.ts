@@ -228,7 +228,7 @@ async function main() {
 
           const downstreamStarted = performance.now();
           const downstreamResponse = await fetch(
-            `${userAdminServiceUrl}${url.pathname}`,
+            `${userAdminServiceUrl}${url.pathname.replace(/^\/user-admin/, "")}`,
             {
               method: req.method,
               headers: {
