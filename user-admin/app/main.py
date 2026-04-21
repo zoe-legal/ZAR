@@ -29,16 +29,29 @@ def get_user_properties(
 ) -> dict[str, Any]:
     total_started = perf_counter()
     identity = require_identity(x_internal_user_id, x_internal_org_id)
+    acquire_started = perf_counter()
     with control_plane_connection() as conn:
+        pool_acquire_ms = elapsed_ms(acquire_started)
         fetch_started = perf_counter()
         properties = fetch_user_properties(conn, identity["internal_org_id"], identity["internal_user_id"])
-    return {
-        **properties,
-        "service_timings": {
-            "fetch_ms": elapsed_ms(fetch_started),
-            "total_ms": elapsed_ms(total_started),
-        },
-    }
+        neon_ms = elapsed_ms(fetch_started)
+        response_build_started = perf_counter()
+        response = {
+            **properties,
+            "service_timings": [{
+                "service": "zoe-user-admin",
+                "timings": {
+                    "pool_acquire_ms": pool_acquire_ms,
+                    "neon_ms": neon_ms,
+                    "response_build_ms": 0.0,
+                    "total_ms": 0.0,
+                },
+            }],
+        }
+        response_build_ms = elapsed_ms(response_build_started)
+        response["service_timings"][0]["timings"]["response_build_ms"] = response_build_ms
+        response["service_timings"][0]["timings"]["total_ms"] = round(pool_acquire_ms + neon_ms + response_build_ms, 2)
+    return response
 
 
 @app.put("/putUserProperties")
@@ -49,20 +62,33 @@ def put_user_properties(
 ) -> dict[str, Any]:
     total_started = perf_counter()
     identity = require_identity(x_internal_user_id, x_internal_org_id)
+    acquire_started = perf_counter()
     with control_plane_connection() as conn:
+        pool_acquire_ms = elapsed_ms(acquire_started)
         update_started = perf_counter()
         apply_user_property_updates(conn, identity["internal_org_id"], identity["internal_user_id"], payload)
         update_ms = elapsed_ms(update_started)
         fetch_started = perf_counter()
         properties = fetch_user_properties(conn, identity["internal_org_id"], identity["internal_user_id"])
-    return {
-        **properties,
-        "service_timings": {
-            "update_ms": update_ms,
-            "fetch_ms": elapsed_ms(fetch_started),
-            "total_ms": elapsed_ms(total_started),
-        },
-    }
+        neon_ms = elapsed_ms(fetch_started)
+        response_build_started = perf_counter()
+        response = {
+            **properties,
+            "service_timings": [{
+                "service": "zoe-user-admin",
+                "timings": {
+                    "pool_acquire_ms": pool_acquire_ms,
+                    "update_ms": update_ms,
+                    "neon_ms": neon_ms,
+                    "response_build_ms": 0.0,
+                    "total_ms": 0.0,
+                },
+            }],
+        }
+        response_build_ms = elapsed_ms(response_build_started)
+        response["service_timings"][0]["timings"]["response_build_ms"] = response_build_ms
+        response["service_timings"][0]["timings"]["total_ms"] = round(pool_acquire_ms + update_ms + neon_ms + response_build_ms, 2)
+    return response
 
 
 @app.get("/getOrgProperties")
@@ -72,20 +98,33 @@ def get_org_properties(
 ) -> dict[str, Any]:
     total_started = perf_counter()
     identity = require_identity(x_internal_user_id, x_internal_org_id)
+    acquire_started = perf_counter()
     with control_plane_connection() as conn:
+        pool_acquire_ms = elapsed_ms(acquire_started)
         owner_started = perf_counter()
         ensure_owner(conn, identity["internal_org_id"], identity["internal_user_id"])
         owner_check_ms = elapsed_ms(owner_started)
         fetch_started = perf_counter()
         properties = fetch_org_properties(conn, identity["internal_org_id"])
-    return {
-        **properties,
-        "service_timings": {
-            "owner_check_ms": owner_check_ms,
-            "fetch_ms": elapsed_ms(fetch_started),
-            "total_ms": elapsed_ms(total_started),
-        },
-    }
+        neon_ms = elapsed_ms(fetch_started)
+        response_build_started = perf_counter()
+        response = {
+            **properties,
+            "service_timings": [{
+                "service": "zoe-user-admin",
+                "timings": {
+                    "pool_acquire_ms": pool_acquire_ms,
+                    "owner_check_ms": owner_check_ms,
+                    "neon_ms": neon_ms,
+                    "response_build_ms": 0.0,
+                    "total_ms": 0.0,
+                },
+            }],
+        }
+        response_build_ms = elapsed_ms(response_build_started)
+        response["service_timings"][0]["timings"]["response_build_ms"] = response_build_ms
+        response["service_timings"][0]["timings"]["total_ms"] = round(pool_acquire_ms + owner_check_ms + neon_ms + response_build_ms, 2)
+    return response
 
 
 @app.put("/putOrgProperties")
@@ -96,7 +135,9 @@ def put_org_properties(
 ) -> dict[str, Any]:
     total_started = perf_counter()
     identity = require_identity(x_internal_user_id, x_internal_org_id)
+    acquire_started = perf_counter()
     with control_plane_connection() as conn:
+        pool_acquire_ms = elapsed_ms(acquire_started)
         owner_started = perf_counter()
         ensure_owner(conn, identity["internal_org_id"], identity["internal_user_id"])
         owner_check_ms = elapsed_ms(owner_started)
@@ -105,15 +146,26 @@ def put_org_properties(
         update_ms = elapsed_ms(update_started)
         fetch_started = perf_counter()
         properties = fetch_org_properties(conn, identity["internal_org_id"])
-    return {
-        **properties,
-        "service_timings": {
-            "owner_check_ms": owner_check_ms,
-            "update_ms": update_ms,
-            "fetch_ms": elapsed_ms(fetch_started),
-            "total_ms": elapsed_ms(total_started),
-        },
-    }
+        neon_ms = elapsed_ms(fetch_started)
+        response_build_started = perf_counter()
+        response = {
+            **properties,
+            "service_timings": [{
+                "service": "zoe-user-admin",
+                "timings": {
+                    "pool_acquire_ms": pool_acquire_ms,
+                    "owner_check_ms": owner_check_ms,
+                    "update_ms": update_ms,
+                    "neon_ms": neon_ms,
+                    "response_build_ms": 0.0,
+                    "total_ms": 0.0,
+                },
+            }],
+        }
+        response_build_ms = elapsed_ms(response_build_started)
+        response["service_timings"][0]["timings"]["response_build_ms"] = response_build_ms
+        response["service_timings"][0]["timings"]["total_ms"] = round(pool_acquire_ms + owner_check_ms + update_ms + neon_ms + response_build_ms, 2)
+    return response
 
 
 def require_identity(internal_user_id: str | None, internal_org_id: str | None) -> dict[str, str]:

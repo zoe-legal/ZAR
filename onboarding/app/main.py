@@ -36,7 +36,7 @@ def get_internal_user_and_org(
     x_clerk_org_id: str | None = Header(default=None),
 ) -> dict[str, Any]:
     total_started = perf_counter()
-    service_timings: dict[str, float] = {}
+    timing_values: dict[str, float] = {}
 
     user_id = (x_clerk_user_id or clerk_user_id or "").strip()
     org_id = (x_clerk_org_id or clerk_org_id or "").strip() or None
@@ -45,36 +45,36 @@ def get_internal_user_and_org(
 
     status_started = perf_counter()
     status_row = get_status_row(user_id)
-    service_timings["status_lookup_ms"] = elapsed_ms(status_started)
+    timing_values["onboarding_neon_ms"] = elapsed_ms(status_started)
 
     if status_row and truthy(status_row["is_onboarded"]):
         mapping_started = perf_counter()
         internal = get_existing_internal_mapping(user_id, status_row["org_id"])
-        service_timings["existing_mapping_ms"] = elapsed_ms(mapping_started)
+        timing_values["control_plane_neon_ms"] = elapsed_ms(mapping_started)
         if not internal:
             raise HTTPException(
                 status_code=500,
                 detail="onboarding status is onboarded but Zoe core mapping is missing",
             )
-        service_timings["total_ms"] = elapsed_ms(total_started)
-        return {"status": "internal_user_details", **internal, "service_timings": service_timings}
+        timing_values["total_ms"] = elapsed_ms(total_started)
+        return {"status": "internal_user_details", **internal, "service_timings": [{"service": "zoe-onboarding", "timings": timing_values}]}
 
     event_started = perf_counter()
     relevant_event = get_latest_greenfield_event(user_id)
-    service_timings["event_lookup_ms"] = elapsed_ms(event_started)
+    timing_values["event_lookup_ms"] = elapsed_ms(event_started)
     if not relevant_event:
-        service_timings["total_ms"] = elapsed_ms(total_started)
-        return {"status": "failed", "reason": "no_greenfield_event", "service_timings": service_timings}
+        timing_values["total_ms"] = elapsed_ms(total_started)
+        return {"status": "failed", "reason": "no_greenfield_event", "service_timings": [{"service": "zoe-onboarding", "timings": timing_values}]}
 
     event_age = datetime.now(tz=UTC) - relevant_event["event_time"]
     if event_age > PENDING_WINDOW:
-        service_timings["total_ms"] = elapsed_ms(total_started)
-        return {"status": "failed", "reason": "greenfield_event_stale", "service_timings": service_timings}
+        timing_values["total_ms"] = elapsed_ms(total_started)
+        return {"status": "failed", "reason": "greenfield_event_stale", "service_timings": [{"service": "zoe-onboarding", "timings": timing_values}]}
 
     effective_org_id = org_id or relevant_event["org_id"]
     if not effective_org_id:
-        service_timings["total_ms"] = elapsed_ms(total_started)
-        return {"status": "pending", "reason": "org_id_not_available", "service_timings": service_timings}
+        timing_values["total_ms"] = elapsed_ms(total_started)
+        return {"status": "pending", "reason": "org_id_not_available", "service_timings": [{"service": "zoe-onboarding", "timings": timing_values}]}
 
     provision_started = perf_counter()
     internal = provision_greenfield_user(
@@ -82,9 +82,9 @@ def get_internal_user_and_org(
         org_id=effective_org_id,
         event_dict=relevant_event["event_dict"],
     )
-    service_timings["provision_ms"] = elapsed_ms(provision_started)
-    service_timings["total_ms"] = elapsed_ms(total_started)
-    return {"status": "internal_user_details", **internal, "service_timings": service_timings}
+    timing_values["provision_ms"] = elapsed_ms(provision_started)
+    timing_values["total_ms"] = elapsed_ms(total_started)
+    return {"status": "internal_user_details", **internal, "service_timings": [{"service": "zoe-onboarding", "timings": timing_values}]}
 
 
 def get_status_row(user_id: str) -> dict[str, Any] | None:

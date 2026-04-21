@@ -135,7 +135,12 @@ async function main() {
             }
           );
           const body = await onboardingResponse.json() as Record<string, unknown>;
-          const { internal_org_id: _internalOrgId, internal_user_id: _internalUserId, ...publicBody } = body;
+          const {
+            internal_org_id: _internalOrgId,
+            internal_user_id: _internalUserId,
+            service_timings: downstreamServiceTimings,
+            ...publicBody
+          } = body;
 
           let responseEntitlements = entitlements;
           let responseEntitlementsMs = entitlementsMs;
@@ -150,6 +155,20 @@ async function main() {
             ...publicBody,
             entitled: responseEntitlements.length > 0,
             fga_allowed: allowed,
+            service_timings: [
+              {
+                service: "zar-backend",
+                timings: {
+                  auth_ms: authMs,
+                  identity_ms: identityMs,
+                  entitlements_ms: responseEntitlementsMs,
+                  fga_ms: fgaMs,
+                  downstream_ms: elapsedMs(downstreamStarted),
+                  total_ms: elapsedMs(totalStarted),
+                },
+              },
+              ...(Array.isArray(downstreamServiceTimings) ? downstreamServiceTimings : []),
+            ],
             timings: {
               auth_ms: authMs,
               identity_ms: identityMs,
