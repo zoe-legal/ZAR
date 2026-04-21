@@ -6,7 +6,7 @@ type YouPaneProps = {
 };
 
 export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
-  const { getToken } = useAuth();
+  const auth = useAuth();
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
 
     async function load() {
       try {
-        const token = await getToken();
+        const token = await auth.getToken();
         const response = await fetch(`${userAdminBaseUrl}/getUserProperties`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -31,7 +31,7 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
 
     load();
     return () => { cancelled = true; };
-  }, [getToken, userAdminBaseUrl]);
+  }, [auth.getToken, userAdminBaseUrl]);
 
   return (
     <section className="settings-panel">

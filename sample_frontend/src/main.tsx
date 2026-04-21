@@ -102,9 +102,9 @@ function ProtectedPage() {
 }
 
 function ProtectedContent() {
-  const { getToken, orgId } = useAuth();
-  const { setActive } = useClerk();
-  const { userMemberships } = useOrganizationList({ userMemberships: true });
+  const auth = useAuth();
+  const clerk = useClerk();
+  const orgList = useOrganizationList({ userMemberships: true });
   const [status, setStatus] = useState("Checking ZAR session...");
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<OrgAdminPane>("dashboard");
@@ -112,16 +112,16 @@ function ProtectedContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    if (orgId || !userMemberships?.data?.[0]) return;
-    void setActive({ organization: userMemberships.data[0].organization });
-  }, [orgId, userMemberships, setActive]);
+    if (auth.orgId || !orgList.userMemberships?.data?.[0]) return;
+    void clerk.setActive({ organization: orgList.userMemberships.data[0].organization });
+  }, [auth.orgId, orgList.userMemberships, clerk.setActive]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkSession() {
       try {
-        const token = await getToken();
+        const token = await auth.getToken();
         if (!token) throw new Error("missing Clerk token");
 
         const response = await fetch(`${zarBaseUrl}/auth/session`, {
@@ -175,7 +175,7 @@ function ProtectedContent() {
     return () => {
       cancelled = true;
     };
-  }, [getToken]);
+  }, [auth.getToken]);
 
   const identity = { displayName };
 
@@ -251,13 +251,17 @@ function ProtectedContent() {
 
         <section className="content-pane">
           <header className="content-header">
-            <p className="status">{status}</p>
+            <p className="status">{status || (!auth.orgId ? "Activating session..." : "")}</p>
           </header>
 
-          {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
-          {activeSection === "settings" ? <SettingsPane identity={identity} /> : null}
-          {activeSection === "you" ? <YouPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
-          {activeSection === "users_roles" ? <UsersRolesPane /> : null}
+          {auth.orgId ? (
+            <>
+              {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
+              {activeSection === "settings" ? <SettingsPane identity={identity} /> : null}
+              {activeSection === "you" ? <YouPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
+              {activeSection === "users_roles" ? <UsersRolesPane /> : null}
+            </>
+          ) : null}
         </section>
       </section>
     </main>
