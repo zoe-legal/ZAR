@@ -423,6 +423,22 @@ button:hover,
   grid-column: span 2;
 }
 
+.field-save-state {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--field-subtext);
+}
+
+.field-save-state-ok {
+  color: #3a9e6a;
+}
+
+.field-save-state-err {
+  color: #cf4a31;
+}
+
 .field-label {
   font-family: Inter, "Helvetica Neue", Arial, sans-serif;
   font-size: 0.6875rem;
