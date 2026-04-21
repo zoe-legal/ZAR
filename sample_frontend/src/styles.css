@@ -336,6 +336,58 @@ button:hover,
   letter-spacing: -0.02em;
 }
 
+.you-profile-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+}
+
+.you-profile-card.settings-card {
+  display: flex;
+}
+
+.you-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.375rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+.you-profile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.you-profile-name {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--section-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.you-profile-sub {
+  font-size: 0.8125rem;
+  color: var(--field-subtext);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .dashboard-welcome {
   margin: 0;
   font-size: 1.75rem;

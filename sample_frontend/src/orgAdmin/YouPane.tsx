@@ -13,42 +13,6 @@ type PropEntry = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-const FIELD_GROUPS = [
-  {
-    label: "Profile",
-    fields: [
-      { key: "user_first_name", label: "First name" },
-      { key: "user_last_name", label: "Last name" },
-      { key: "user_display_name", label: "Display name" },
-      { key: "user_title", label: "Title" },
-      { key: "user_email", label: "Email" },
-    ],
-  },
-  {
-    label: "Contact",
-    fields: [
-      { key: "user_phone", label: "Phone" },
-      { key: "user_notification_email", label: "Notification email" },
-      { key: "user_notification_sms_number", label: "SMS number" },
-    ],
-  },
-  {
-    label: "Professional",
-    fields: [
-      { key: "user_bar_number", label: "Bar number" },
-      { key: "user_practice_jurisdiction", label: "Practice jurisdiction" },
-      { key: "user_department", label: "Department" },
-    ],
-  },
-  {
-    label: "Preferences",
-    fields: [
-      { key: "user_timezone", label: "Timezone" },
-      { key: "user_locale", label: "Locale" },
-    ],
-  },
-];
-
 export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
   const auth = useAuth();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -70,12 +34,16 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
         if (!response.ok) throw new Error((body as { error?: string }).error ?? "Failed to load");
         if (cancelled) return;
 
+        const keys = [
+          "user_first_name", "user_last_name", "user_display_name", "user_title",
+          "user_email", "user_phone", "user_notification_email", "user_notification_sms_number",
+          "user_bar_number", "user_practice_jurisdiction", "user_department",
+          "user_timezone", "user_locale",
+        ];
         const initial: Record<string, string> = {};
-        for (const group of FIELD_GROUPS) {
-          for (const field of group.fields) {
-            const entry = body[field.key] as PropEntry | undefined;
-            initial[field.key] = entry?.current_value ?? "";
-          }
+        for (const key of keys) {
+          const entry = body[key] as PropEntry | undefined;
+          initial[key] = entry?.current_value ?? "";
         }
         savedRef.current = { ...initial };
         setValues(initial);
@@ -112,39 +80,88 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
     }
   }
 
+  function field(key: string, label: string, opts?: { type?: string }) {
+    const state = saved[key] ?? "idle";
+    return (
+      <label key={key} className="field">
+        <span className="field-label">
+          {label}
+          {state === "saving" && <span className="field-save-state"> · Saving…</span>}
+          {state === "saved" && <span className="field-save-state field-save-state-ok"> · Saved</span>}
+          {state === "error" && <span className="field-save-state field-save-state-err"> · Error</span>}
+        </span>
+        <input
+          type={opts?.type ?? "text"}
+          value={values[key] ?? ""}
+          onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+          onBlur={() => saveField(key, values[key] ?? "")}
+        />
+      </label>
+    );
+  }
+
   if (loading) return <section className="settings-panel"><p className="status">Loading...</p></section>;
   if (error) return <section className="settings-panel"><p className="status">{error}</p></section>;
 
+  const displayName = values["user_display_name"] || [values["user_first_name"], values["user_last_name"]].filter(Boolean).join(" ") || "—";
+  const subtitle = [values["user_title"], values["user_email"]].filter(Boolean).join(" · ");
+
   return (
     <section className="settings-panel">
-      {FIELD_GROUPS.map((group) => (
-        <section key={group.label} className="settings-card">
-          <div className="settings-card-header">
-            <h2>{group.label}</h2>
+
+      <section className="settings-card you-profile-card">
+        <div className="you-avatar">{displayName.charAt(0).toUpperCase()}</div>
+        <div className="you-profile-meta">
+          <p className="you-profile-name">{displayName}</p>
+          {subtitle && <p className="you-profile-sub">{subtitle}</p>}
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-card-header"><h2>Personal details</h2></div>
+        <div className="settings-form">
+          <div className="field-row field-row-2">
+            {field("user_first_name", "First name")}
+            {field("user_last_name", "Last name")}
           </div>
-          <div className="settings-form">
-            {group.fields.map((field) => {
-              const state = saved[field.key] ?? "idle";
-              return (
-                <label key={field.key} className="field">
-                  <span className="field-label">
-                    {field.label}
-                    {state === "saving" && <span className="field-save-state"> · Saving…</span>}
-                    {state === "saved" && <span className="field-save-state field-save-state-ok"> · Saved</span>}
-                    {state === "error" && <span className="field-save-state field-save-state-err"> · Error</span>}
-                  </span>
-                  <input
-                    type="text"
-                    value={values[field.key] ?? ""}
-                    onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
-                    onBlur={() => saveField(field.key, values[field.key] ?? "")}
-                  />
-                </label>
-              );
-            })}
+          {field("user_display_name", "Display name")}
+          {field("user_title", "Title")}
+          {field("user_email", "Email", { type: "email" })}
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-card-header"><h2>Contact</h2></div>
+        <div className="settings-form">
+          <div className="field-row field-row-2">
+            {field("user_phone", "Phone")}
+            {field("user_notification_sms_number", "SMS number")}
           </div>
-        </section>
-      ))}
+          {field("user_notification_email", "Notification email", { type: "email" })}
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-card-header"><h2>Professional</h2></div>
+        <div className="settings-form">
+          <div className="field-row field-row-2">
+            {field("user_bar_number", "Bar number")}
+            {field("user_department", "Department")}
+          </div>
+          {field("user_practice_jurisdiction", "Practice jurisdiction")}
+        </div>
+      </section>
+
+      <section className="settings-card">
+        <div className="settings-card-header"><h2>Preferences</h2></div>
+        <div className="settings-form">
+          <div className="field-row field-row-2">
+            {field("user_timezone", "Timezone")}
+            {field("user_locale", "Locale")}
+          </div>
+        </div>
+      </section>
+
     </section>
   );
 }
