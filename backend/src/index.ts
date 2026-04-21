@@ -146,7 +146,7 @@ async function main() {
 
           sendJson(res, onboardingResponse.status, {
             ...body,
-            entitlements: responseEntitlements,
+            entitled: responseEntitlements.length > 0,
             fga_allowed: allowed,
             timings: {
               auth_ms: authMs,
