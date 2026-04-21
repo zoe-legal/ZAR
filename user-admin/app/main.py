@@ -40,6 +40,7 @@ def get_user_properties(
             **properties,
             "service_timings": [{
                 "service": "zoe-user-admin",
+                "endpoint": "/getUserProperties",
                 "timings": {
                     "pool_acquire_ms": pool_acquire_ms,
                     "neon_ms": neon_ms,
@@ -76,6 +77,7 @@ def put_user_properties(
             **properties,
             "service_timings": [{
                 "service": "zoe-user-admin",
+                "endpoint": "/putUserProperties",
                 "timings": {
                     "pool_acquire_ms": pool_acquire_ms,
                     "update_ms": update_ms,
@@ -112,6 +114,7 @@ def get_org_properties(
             **properties,
             "service_timings": [{
                 "service": "zoe-user-admin",
+                "endpoint": "/getOrgProperties",
                 "timings": {
                     "pool_acquire_ms": pool_acquire_ms,
                     "owner_check_ms": owner_check_ms,
@@ -152,6 +155,7 @@ def put_org_properties(
             **properties,
             "service_timings": [{
                 "service": "zoe-user-admin",
+                "endpoint": "/putOrgProperties",
                 "timings": {
                     "pool_acquire_ms": pool_acquire_ms,
                     "owner_check_ms": owner_check_ms,
