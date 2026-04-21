@@ -55,7 +55,9 @@ async function main() {
           });
           const authMs = elapsedMs(authStarted);
           const clerkUserId = verifiedToken.sub;
-          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
+          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id
+            : typeof (verifiedToken as Record<string, unknown> & { o?: { id?: unknown } }).o?.id === "string" ? (verifiedToken as Record<string, unknown> & { o?: { id?: unknown } }).o!.id as string
+            : null;
 
           const identityStarted = performance.now();
           const identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
@@ -109,7 +111,9 @@ async function main() {
           });
           const authMs = elapsedMs(authStarted);
           const clerkUserId = verifiedToken.sub;
-          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
+          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id
+            : typeof (verifiedToken as Record<string, unknown> & { o?: { id?: unknown } }).o?.id === "string" ? (verifiedToken as Record<string, unknown> & { o?: { id?: unknown } }).o!.id as string
+            : null;
 
           const identityStarted = performance.now();
           const identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
@@ -196,7 +200,9 @@ async function main() {
           });
           const authMs = elapsedMs(authStarted);
           const clerkUserId = verifiedToken.sub;
-          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
+          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id
+            : typeof (verifiedToken as Record<string, unknown> & { o?: { id?: unknown } }).o?.id === "string" ? (verifiedToken as Record<string, unknown> & { o?: { id?: unknown } }).o!.id as string
+            : null;
 
           const identityStarted = performance.now();
           const identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
