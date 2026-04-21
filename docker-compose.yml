@@ -34,6 +34,7 @@ services:
     environment:
       AWS_REGION: us-west-1
       ONBOARDING_SERVICE_URL: http://zoe-onboarding-api:8790
+      USER_ADMIN_SERVICE_URL: http://zoe-user-admin-api:8791
       OPENFGA_API_URL: http://openfga:8080
     expose:
       - "8788"

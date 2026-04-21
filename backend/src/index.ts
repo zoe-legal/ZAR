@@ -16,6 +16,7 @@ async function main() {
   const controlPlaneDb = createControlPlaneDb(config.control_plane_database_url);
   const clerkWebhook = new Webhook(config.clerk_webhook_signing_secret);
   const onboardingServiceUrl = process.env.ONBOARDING_SERVICE_URL ?? "http://localhost:8790";
+  const userAdminServiceUrl = process.env.USER_ADMIN_SERVICE_URL ?? "http://localhost:8791";
   const openFgaApiUrl = process.env.OPENFGA_API_URL ?? "http://localhost:8080";
   const openFga = await bootstrapOpenFga(openFgaApiUrl);
 
@@ -152,6 +153,94 @@ async function main() {
               auth_ms: authMs,
               identity_ms: identityMs,
               entitlements_ms: responseEntitlementsMs,
+              fga_ms: fgaMs,
+              downstream_ms: elapsedMs(downstreamStarted),
+              total_ms: elapsedMs(totalStarted),
+            },
+          });
+        } catch {
+          console.warn(JSON.stringify({ event: "auth.session.invalid_token" }));
+          sendJson(res, 401, { error: "invalid_bearer_token" });
+        }
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/user-admin/openapi.json") {
+        const downstreamResponse = await fetch(`${userAdminServiceUrl}/openapi.json`);
+        const body = await downstreamResponse.json() as Record<string, unknown>;
+        sendJson(res, downstreamResponse.status, body);
+        return;
+      }
+
+      if (
+        (req.method === "GET" || req.method === "PUT")
+        && (
+          url.pathname === "/user-admin/getUserProperties"
+          || url.pathname === "/user-admin/putUserProperties"
+          || url.pathname === "/user-admin/getOrgProperties"
+          || url.pathname === "/user-admin/putOrgProperties"
+        )
+      ) {
+        const token = bearerToken(req);
+        if (!token) {
+          sendJson(res, 401, { error: "missing_bearer_token" });
+          return;
+        }
+
+        try {
+          const totalStarted = performance.now();
+          const authStarted = performance.now();
+          const verifiedToken = await verifyToken(token, {
+            secretKey: config.clerk_secret_key,
+          });
+          const authMs = elapsedMs(authStarted);
+          const clerkUserId = verifiedToken.sub;
+          const clerkOrgId = typeof verifiedToken.org_id === "string" ? verifiedToken.org_id : null;
+
+          const identityStarted = performance.now();
+          const identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
+          const identityMs = elapsedMs(identityStarted);
+
+          if (!identity.internal_user_id || !identity.internal_org_id) {
+            sendJson(res, 403, { error: "internal_identity_required" });
+            return;
+          }
+
+          const entitlementsStarted = performance.now();
+          await fetchOrgEntitlements(controlPlaneDb, identity.internal_org_id);
+          const entitlementsMs = elapsedMs(entitlementsStarted);
+
+          const fgaStarted = performance.now();
+          const allowed = await checkFgaAllowed(openFga, identity, url.pathname, req.method);
+          const fgaMs = elapsedMs(fgaStarted);
+
+          if (!allowed) {
+            sendJson(res, 403, { error: "forbidden" });
+            return;
+          }
+
+          const downstreamStarted = performance.now();
+          const downstreamResponse = await fetch(
+            `${userAdminServiceUrl}${url.pathname}`,
+            {
+              method: req.method,
+              headers: {
+                ...(req.method === "PUT" ? { "Content-Type": "application/json" } : {}),
+                "X-Internal-User-Id": identity.internal_user_id,
+                "X-Internal-Org-Id": identity.internal_org_id,
+              },
+              body: req.method === "PUT" ? await readRawBody(req) : undefined,
+            }
+          );
+          const body = await downstreamResponse.json() as Record<string, unknown>;
+
+          sendJson(res, downstreamResponse.status, {
+            ...body,
+            fga_allowed: allowed,
+            timings: {
+              auth_ms: authMs,
+              identity_ms: identityMs,
+              entitlements_ms: entitlementsMs,
               fga_ms: fgaMs,
               downstream_ms: elapsedMs(downstreamStarted),
               total_ms: elapsedMs(totalStarted),
