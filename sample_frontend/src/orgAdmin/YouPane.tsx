@@ -144,7 +144,7 @@ export function YouPane({ userAdminBaseUrl }: YouPaneProps) {
   if (error) return <section className="settings-panel"><p className="status">{error}</p></section>;
 
   const displayName = values["user_display_name"] || [values["user_first_name"], values["user_last_name"]].filter(Boolean).join(" ") || "—";
-  const subtitle = [values["user_title"], values["user_email"]].filter(Boolean).join(" · ");
+  const subtitle = values["user_email"] || "";
 
   return (
     <section className="settings-panel">

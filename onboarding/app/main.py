@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from time import perf_counter
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Query
@@ -34,39 +35,56 @@ def get_internal_user_and_org(
     x_clerk_user_id: str | None = Header(default=None),
     x_clerk_org_id: str | None = Header(default=None),
 ) -> dict[str, Any]:
+    total_started = perf_counter()
+    service_timings: dict[str, float] = {}
+
     user_id = (x_clerk_user_id or clerk_user_id or "").strip()
     org_id = (x_clerk_org_id or clerk_org_id or "").strip() or None
     if not user_id:
       raise HTTPException(status_code=400, detail="clerk user id is required")
 
+    status_started = perf_counter()
     status_row = get_status_row(user_id)
+    service_timings["status_lookup_ms"] = elapsed_ms(status_started)
+
     if status_row and truthy(status_row["is_onboarded"]):
+        mapping_started = perf_counter()
         internal = get_existing_internal_mapping(user_id, status_row["org_id"])
+        service_timings["existing_mapping_ms"] = elapsed_ms(mapping_started)
         if not internal:
             raise HTTPException(
                 status_code=500,
                 detail="onboarding status is onboarded but Zoe core mapping is missing",
             )
-        return {"status": "internal_user_details", **internal}
+        service_timings["total_ms"] = elapsed_ms(total_started)
+        return {"status": "internal_user_details", **internal, "service_timings": service_timings}
 
+    event_started = perf_counter()
     relevant_event = get_latest_greenfield_event(user_id)
+    service_timings["event_lookup_ms"] = elapsed_ms(event_started)
     if not relevant_event:
-        return {"status": "failed", "reason": "no_greenfield_event"}
+        service_timings["total_ms"] = elapsed_ms(total_started)
+        return {"status": "failed", "reason": "no_greenfield_event", "service_timings": service_timings}
 
     event_age = datetime.now(tz=UTC) - relevant_event["event_time"]
     if event_age > PENDING_WINDOW:
-        return {"status": "failed", "reason": "greenfield_event_stale"}
+        service_timings["total_ms"] = elapsed_ms(total_started)
+        return {"status": "failed", "reason": "greenfield_event_stale", "service_timings": service_timings}
 
     effective_org_id = org_id or relevant_event["org_id"]
     if not effective_org_id:
-        return {"status": "pending", "reason": "org_id_not_available"}
+        service_timings["total_ms"] = elapsed_ms(total_started)
+        return {"status": "pending", "reason": "org_id_not_available", "service_timings": service_timings}
 
+    provision_started = perf_counter()
     internal = provision_greenfield_user(
         user_id=user_id,
         org_id=effective_org_id,
         event_dict=relevant_event["event_dict"],
     )
-    return {"status": "internal_user_details", **internal}
+    service_timings["provision_ms"] = elapsed_ms(provision_started)
+    service_timings["total_ms"] = elapsed_ms(total_started)
+    return {"status": "internal_user_details", **internal, "service_timings": service_timings}
 
 
 def get_status_row(user_id: str) -> dict[str, Any] | None:
@@ -556,3 +574,7 @@ def cleaned(value: Any) -> str | None:
 
 def truthy(value: Any) -> bool:
     return value is True
+
+
+def elapsed_ms(started: float) -> float:
+    return round((perf_counter() - started) * 1000, 2)

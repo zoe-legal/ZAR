@@ -276,7 +276,7 @@ export function SettingsPane({ userAdminBaseUrl }: SettingsPaneProps) {
         <div className="settings-card-header"><h2>Danger zone</h2></div>
         <div className="settings-form">
           <div className="settings-actions">
-            <button type="button" className="danger-button">Delete organization</button>
+            <button type="button" className="danger-button" disabled>Delete organization</button>
           </div>
         </div>
       </section>

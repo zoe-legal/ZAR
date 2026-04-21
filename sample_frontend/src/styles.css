@@ -612,6 +612,15 @@ button:hover,
   border-color: #cf4a31;
 }
 
+.danger-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.danger-button:disabled:hover {
+  background: transparent;
+}
+
 .settings-toggle-row {
   display: flex;
   align-items: center;
