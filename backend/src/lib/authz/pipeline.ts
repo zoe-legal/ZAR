@@ -42,9 +42,7 @@ export async function resolveInternalIdentity(
       um.internal_user_id::text as internal_user_id,
       um.internal_org_id::text as internal_org_id
     from zoe_czar.user_map um
-    where um.external_user_id_source = 'clerk'
-      and um.external_user_id = $1
-      and um.external_org_id_source = 'clerk'
+    where um.external_user_id = $1
       and um.external_org_id = $2
     limit 1
     `,
