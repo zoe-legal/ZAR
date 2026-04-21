@@ -6,11 +6,11 @@ This repo currently contains three API surfaces plus a sample UI and local edge 
 
 - `backend/` — ZAR itself
 - `onboarding/` — greenfield onboarding API
-- `user-admin/` — property-editing API
+- `user-admin/` — property-editing API behind ZAR
 - `sample_frontend/` — Clerk test UI and current org-admin surface
 - `docker-compose.yml` / `nginx.edge.conf` — local and dev-machine edge composition
 
-Only `backend/` is the actual Zoe Authorized Router. `onboarding/` and `user-admin/` are temporarily co-located here for speed while the contracts settle. They are not intended to remain in this repo for real deployment.
+Only `backend/` is the actual Zoe Authorized Router. `onboarding/` and `user-admin/` are temporarily co-located here for speed while the contracts settle. They are not intended to remain in this repo for real deployment. Even while co-located, they are downstream services and must not be directly exposed to clients.
 
 ## Components
 
@@ -49,7 +49,8 @@ The public request path is currently:
 2. AWS ALB terminates TLS
 3. ALB forwards to EC2 on port `80`
 4. `zar-edge-nginx` receives the request
-5. nginx routes to the appropriate internal service over the `zoe_czar` Docker network
+5. nginx routes public `/api/*` traffic to `zar-backend` over the `zoe_czar` Docker network
+6. ZAR routes downstream API calls to the internal services
 
 ## ZAR
 
@@ -72,17 +73,13 @@ The current path running on `dev.zoe-legal.net` is:
 1. browser or client calls the public domain
 2. ALB terminates TLS with ACM
 3. EC2 edge nginx receives the request
-4. nginx routes to:
-   - `sample-ui`
-   - `zar-backend`
-   - `zoe-onboarding-api`
-   - `zoe-user-admin-api`
+4. nginx routes public `/api/*` traffic to `zar-backend` and browser traffic to `sample-ui`
 5. ZAR performs:
    - Clerk JWT verification
    - internal identity resolution from Zoe core
    - org entitlement fetch from Zoe core
    - real OpenFGA network check
-6. ZAR forwards to the appropriate downstream API
+6. ZAR forwards to the appropriate internal downstream API
 
 ### Current Stack
 
@@ -92,6 +89,22 @@ The current path running on `dev.zoe-legal.net` is:
 - entitlement store: Zoe control-plane Postgres / Neon
 - fine-grained authorization: real OpenFGA container
 - deployment target: EC2 behind ALB
+
+### Routing And Identity Contract
+
+All downstream APIs must follow the same public shape:
+
+- `/api/<domain>/...`
+
+That contract is enforced for architectural reasons:
+
+- clients talk only to ZAR
+- downstream services are internal-only
+- clients identify themselves only with a Clerk JWT
+- clients do not send internal Zoe IDs to downstream APIs
+- ZAR resolves internal identity, performs entitlement and FGA checks, and forwards only the internal context needed by the downstream service
+
+This is now the required pattern for all subsequent APIs. `user-admin` has already been removed from the direct public path and is reachable only through ZAR.
 
 ### Current ZAR Endpoints
 
@@ -182,12 +195,14 @@ It currently owns:
 
 - `GET /getInternalUserAndOrg`
 
-Current success response returns:
+The internal onboarding service success response currently returns:
 
 - `internal_org_id`
 - `internal_user_id`
 - `org_ring`
 - `display_name`
+
+ZAR suppresses the internal IDs before returning the browser-visible `/api/onboarding/internal-user-and-org` response.
 
 ### Current Data Sources
 
@@ -210,7 +225,7 @@ It should be moved out into its own repo once the API contract stabilizes. It is
 
 ### Purpose
 
-`user-admin/` is the settings and property-management API behind ZAR.
+`user-admin/` is the settings and property-management API behind ZAR. It is no longer on a direct public route.
 
 It currently owns:
 
@@ -230,6 +245,8 @@ It currently owns:
 ### Current Behavior
 
 - caller identity is forwarded from ZAR using internal IDs
+- browser clients never call this service directly
+- browser clients send only a Clerk JWT to ZAR
 - user property routes trust caller self-scope
 - org property routes verify owner role in Zoe core
 - GET returns all defined properties with `null` for unset values
@@ -282,7 +299,7 @@ All of them run on the internal Docker network:
 
 - `zoe_czar`
 
-Public path routing is currently handled by `nginx.edge.conf`.
+Public path routing is currently handled by `nginx.edge.conf`. Downstream APIs are expected to stay internal and be reached through ZAR routes under `/api/<domain>/...`.
 
 ## TODOs
 
@@ -377,12 +394,10 @@ In the current API shape, the success status returned to the client is:
 
 with:
 
-- `internal_org_id`
-- `internal_user_id`
 - `org_ring`
 - `display_name`
 
-ZAR also includes current entitlements in the routed response.
+ZAR now suppresses internal user and org IDs from the browser-visible onboarding response.
 
 ### Current Write Behavior
 
