@@ -190,6 +190,7 @@ def create_org_invite(
 
         email_address = required_payload_string(payload, "email_address")
         zoe_role_key = required_payload_string(payload, "role_key")
+        redirect_url = optional_payload_string(payload, "redirect_url")
         validate_role_started = perf_counter()
         validate_role_exists(conn, zoe_role_key)
         external_org_id = get_clerk_org_id(conn, identity["internal_org_id"])
@@ -200,6 +201,7 @@ def create_org_invite(
             organization_id=external_org_id,
             email_address=email_address,
             zoe_role_key=zoe_role_key,
+            redirect_url=redirect_url,
         )
         clerk_api_ms = elapsed_ms(clerk_started)
 
@@ -427,6 +429,7 @@ def create_clerk_org_invitation(
     organization_id: str,
     email_address: str,
     zoe_role_key: str,
+    redirect_url: str | None,
 ) -> dict[str, Any]:
     settings = get_settings()
     clerk_role = "org:admin" if zoe_role_key == "owner" else "org:member"
@@ -437,6 +440,8 @@ def create_clerk_org_invitation(
             "zoe_role_key": zoe_role_key,
         },
     }
+    if redirect_url:
+        request_payload["redirect_url"] = redirect_url
 
     req = request.Request(
         f"{settings.clerk_api_base_url}/organizations/{organization_id}/invitations",
