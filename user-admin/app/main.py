@@ -444,6 +444,8 @@ def create_clerk_org_invitation(
         headers={
             "Authorization": f"Bearer {settings.clerk_secret_key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "zoe-user-admin/0.1 clerk-invite",
         },
         method="POST",
     )
