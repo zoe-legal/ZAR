@@ -193,13 +193,11 @@ def create_org_invite(
         validate_role_started = perf_counter()
         validate_role_exists(conn, zoe_role_key)
         external_org_id = get_clerk_org_id(conn, identity["internal_org_id"])
-        inviter_user_id = get_clerk_user_id(conn, identity["internal_org_id"], identity["internal_user_id"])
         validate_role_ms = elapsed_ms(validate_role_started)
 
         clerk_started = perf_counter()
         invitation = create_clerk_org_invitation(
             organization_id=external_org_id,
-            inviter_user_id=inviter_user_id,
             email_address=email_address,
             zoe_role_key=zoe_role_key,
         )
@@ -289,22 +287,6 @@ def get_clerk_org_id(conn: Any, internal_org_id: str) -> str:
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=500, detail="clerk_org_mapping_missing")
-    return row[0]
-
-
-def get_clerk_user_id(conn: Any, internal_org_id: str, internal_user_id: str) -> str:
-    row = conn.execute(
-        """
-        select external_user_id
-        from zoe_czar.user_map
-        where internal_org_id = %s::uuid
-          and internal_user_id = %s::uuid
-          and external_user_id_source = 'clerk'
-        """,
-        (internal_org_id, internal_user_id),
-    ).fetchone()
-    if row is None:
-        raise HTTPException(status_code=500, detail="clerk_user_mapping_missing")
     return row[0]
 
 
@@ -443,14 +425,12 @@ def apply_org_property_updates(conn: Any, internal_org_id: str, payload: dict[st
 def create_clerk_org_invitation(
     *,
     organization_id: str,
-    inviter_user_id: str,
     email_address: str,
     zoe_role_key: str,
 ) -> dict[str, Any]:
     settings = get_settings()
     clerk_role = "org:admin" if zoe_role_key == "owner" else "org:member"
     request_payload: dict[str, Any] = {
-        "inviter_user_id": inviter_user_id,
         "email_address": email_address,
         "role": clerk_role,
         "public_metadata": {
@@ -472,7 +452,11 @@ def create_clerk_org_invitation(
             return json.loads(response.read().decode())
     except error.HTTPError as exc:
         detail = exc.read().decode()
-        raise HTTPException(status_code=exc.code, detail=f"clerk_invitation_failed:{detail}") from exc
+        try:
+            parsed = json.loads(detail)
+        except json.JSONDecodeError:
+            parsed = {"raw": detail}
+        raise HTTPException(status_code=exc.code, detail={"code": "clerk_invitation_failed", "clerk": parsed}) from exc
 
 
 def required_payload_string(payload: dict[str, str | None], key: str) -> str:
