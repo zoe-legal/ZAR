@@ -39,7 +39,7 @@ export function UsersRolesPane({ userAdminBaseUrl }: UsersRolesPaneProps) {
         body: JSON.stringify({
           email_address: emailAddress,
           role_key: roleKey,
-          redirect_url: `${window.location.origin}/protected`,
+          redirect_url: `${window.location.origin}/accept-invitation`,
         }),
       });
 
