@@ -339,7 +339,7 @@ The current onboarding flow uses two tables in the onboarding database:
 They have distinct roles:
 
 - `events` answers whether the relevant trigger event has happened
-- `status` answers whether onboarding is already complete and what the current onboarding state is
+- `status` answers whether onboarding is already complete for a specific `(user_id, org_id)` pair and what the current onboarding state is
 
 ### Current Endpoint Contract
 
@@ -353,7 +353,7 @@ This endpoint is called after authentication and decides whether the caller is a
 
 The current decision order is:
 
-1. check `onboarding.status`
+1. check `onboarding.status` for the current `(user_id, org_id)` tuple
 2. if `is_onboarded = true`, return the existing internal identity immediately
 3. if not onboarded, inspect `onboarding.events`
 4. if the required event exists and is recent enough, perform greenfield onboarding synchronously

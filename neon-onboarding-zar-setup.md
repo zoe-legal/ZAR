@@ -20,15 +20,18 @@ Run this SQL in the ZAR Neon database:
 create schema if not exists onboarding;
 
 create table if not exists onboarding.status (
-  user_id text primary key,
-  org_id text,
+  user_id text not null,
+  org_id text not null,
   needs_onboarding boolean not null default true,
   is_onboarded boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
   constraint onboarding_status_consistency_check
-    check (not (needs_onboarding and is_onboarded))
+    check (not (needs_onboarding and is_onboarded)),
+
+  constraint status_pkey
+    primary key (user_id, org_id)
 );
 
 create table if not exists onboarding.events (
