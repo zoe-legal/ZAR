@@ -61,24 +61,20 @@ export async function storeClerkWebhookEvent(
   };
 }
 
-export async function maybeTriggerGreenfieldOnboarding(
+export async function maybeTriggerOrganizationMembershipOnboarding(
   db: OnboardingDb,
   event: ClerkWebhookEvent
 ): Promise<{ triggered: boolean; reason: string }> {
   if (event.type !== "organizationMembership.created") {
-    return { triggered: false, reason: "event_type_not_greenfield_trigger" };
+    return { triggered: false, reason: "event_type_not_membership_trigger" };
   }
 
   const data = (event.data ?? {}) as MembershipData;
   const userId = data.public_user_data?.user_id;
   const orgId = data.organization?.id;
-  const role = data.role;
 
   if (!userId || !orgId) {
     return { triggered: false, reason: "missing_user_or_org" };
-  }
-  if (role !== "org:admin") {
-    return { triggered: false, reason: "membership_role_not_admin" };
   }
 
   await db.query(
@@ -88,8 +84,8 @@ export async function maybeTriggerGreenfieldOnboarding(
        needs_onboarding,
        is_onboarded
      ) values ($1, $2, true, false)
-     on conflict (user_id) do update
-       set org_id = coalesce(onboarding.status.org_id, excluded.org_id),
+     on conflict (user_id, org_id) do update
+       set
            needs_onboarding = case
              when onboarding.status.is_onboarded then false
              else true
@@ -98,7 +94,7 @@ export async function maybeTriggerGreenfieldOnboarding(
     [userId, orgId]
   );
 
-  return { triggered: true, reason: "greenfield_status_upserted" };
+  return { triggered: true, reason: "membership_status_upserted" };
 }
 
 function extractEventIds(event: ClerkWebhookEvent): { userId: string | null; orgId: string | null } {

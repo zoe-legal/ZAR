@@ -6,7 +6,7 @@ import { bootstrapOpenFga, checkFgaAllowed, fetchOrgEntitlements, resolveInterna
 import { createControlPlaneDb } from "./lib/db/controlPlaneDb.js";
 import { createOnboardingDb } from "./lib/db/onboardingDb.js";
 import {
-  maybeTriggerGreenfieldOnboarding,
+  maybeTriggerOrganizationMembershipOnboarding,
   storeClerkWebhookEvent,
 } from "./lib/onboarding/events.js";
 
@@ -193,12 +193,13 @@ async function main() {
       }
 
       if (
-        (req.method === "GET" || req.method === "PUT")
+        (req.method === "GET" || req.method === "PUT" || req.method === "POST")
         && (
           url.pathname === "/user-admin/getUserProperties"
           || url.pathname === "/user-admin/putUserProperties"
           || url.pathname === "/user-admin/getOrgProperties"
           || url.pathname === "/user-admin/putOrgProperties"
+          || url.pathname === "/user-admin/createOrgInvite"
         )
       ) {
         const token = bearerToken(req);
@@ -245,11 +246,11 @@ async function main() {
             {
               method: req.method,
               headers: {
-                ...(req.method === "PUT" ? { "Content-Type": "application/json" } : {}),
+                ...((req.method === "PUT" || req.method === "POST") ? { "Content-Type": "application/json" } : {}),
                 "X-Internal-User-Id": identity.internal_user_id,
                 "X-Internal-Org-Id": identity.internal_org_id,
               },
-              body: req.method === "PUT" ? await readRawBody(req) : undefined,
+              body: (req.method === "PUT" || req.method === "POST") ? await readRawBody(req) : undefined,
             }
           );
           const body = await downstreamResponse.json() as Record<string, unknown>;
@@ -298,7 +299,7 @@ async function main() {
           user_id: stored.userId,
           org_id: stored.orgId,
         }));
-        const greenfield = await maybeTriggerGreenfieldOnboarding(onboardingDb, event);
+        const greenfield = await maybeTriggerOrganizationMembershipOnboarding(onboardingDb, event);
         console.info(JSON.stringify({
           event: "greenfield.trigger.checked",
           clerk_event_id: event.id ?? null,

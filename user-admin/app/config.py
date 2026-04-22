@@ -35,6 +35,8 @@ class Settings:
     aws_region: str
     control_plane_secret_id: str
     control_plane_database_url: str
+    clerk_secret_key: str
+    clerk_api_base_url: str
     port: int = 8791
 
 
@@ -65,5 +67,11 @@ def get_settings() -> Settings:
         ("zoe_control_plane_database_url", "control_plane_database_url", "database_url"),
         "control plane database url",
       ),
+      clerk_secret_key=_first_string(
+        control_plane_secret,
+        ("clerk_secret_key",),
+        "clerk secret key",
+      ),
+      clerk_api_base_url=os.getenv("CLERK_API_BASE_URL", "https://api.clerk.com/v1").rstrip("/"),
       port=int(os.getenv("PORT", "8791")),
     )
