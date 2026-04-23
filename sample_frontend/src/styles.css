@@ -70,6 +70,10 @@ body {
   border-radius: 8px;
 }
 
+.auth-shell {
+  width: min(100%, 420px);
+}
+
 .hero {
   width: min(90vw, 800px);
   text-align: center;
@@ -141,6 +145,11 @@ button:hover,
   gap: 28px;
 }
 
+.invite-shell-split {
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 420px);
+  align-items: start;
+}
+
 .invite-hero {
   display: grid;
   gap: 14px;
@@ -206,11 +215,23 @@ button:hover,
   min-height: 420px;
 }
 
+.invite-auth-card-split {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+}
+
 .invite-auth-card .cl-rootBox,
 .invite-auth-card .cl-cardBox,
 .invite-auth-card .cl-card {
   width: 100%;
   max-width: 100%;
+}
+
+.invite-auth-card .cl-card {
+  box-shadow: none;
+  border: none;
 }
 
 .invite-signed-in {
@@ -222,6 +243,11 @@ button:hover,
   background: #ffffff;
   border: 1px solid #e8e8e8;
   border-radius: 12px;
+}
+
+.invite-signed-out {
+  display: grid;
+  gap: 12px;
 }
 
 .invite-signed-in-title {
@@ -830,6 +856,10 @@ button:hover,
 }
 
 @media (max-width: 900px) {
+  .invite-shell-split {
+    grid-template-columns: 1fr;
+  }
+
   .admin-shell {
     grid-template-columns: 1fr;
   }
