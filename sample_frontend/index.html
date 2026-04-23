@@ -4,10 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ZAR Sample Frontend</title>
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var ticket = params.get("__clerk_ticket") || params.get("ticket");
+          var status = params.get("__clerk_status");
+          if (ticket) {
+            window.sessionStorage.setItem("zoe_invite_ticket", ticket);
+          }
+          if (status) {
+            window.sessionStorage.setItem("zoe_invite_status", status);
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
