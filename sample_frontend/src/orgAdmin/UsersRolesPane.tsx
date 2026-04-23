@@ -6,6 +6,19 @@ type UsersRolesPaneProps = {
 };
 
 type InviteState = "idle" | "sending" | "sent" | "error";
+type InviteErrorBody = {
+  error?: string;
+  detail?: string | {
+    code?: string;
+    phase?: string;
+    message?: string;
+    clerk?: { raw?: string };
+    zoe_invitation_id?: string;
+    clerk_invitation_id?: string;
+  };
+  email_address?: string;
+  zoe_role_key?: string;
+};
 
 const ROLE_OPTIONS = [
   { value: "owner", label: "Owner", blurb: "Full org authority and invite access." },
@@ -81,15 +94,10 @@ export function UsersRolesPane({ userAdminBaseUrl }: UsersRolesPaneProps) {
         }),
       });
 
-      const body = await response.json() as {
-        error?: string;
-        detail?: string;
-        email_address?: string;
-        zoe_role_key?: string;
-      };
+      const body = await response.json() as InviteErrorBody;
 
       if (!response.ok) {
-        throw new Error(body.detail ?? body.error ?? "Failed to create invite");
+        throw new Error(describeInviteError(body));
       }
 
       setInviteState("sent");
@@ -224,4 +232,23 @@ export function UsersRolesPane({ userAdminBaseUrl }: UsersRolesPaneProps) {
       </section>
     </section>
   );
+}
+
+function describeInviteError(body: InviteErrorBody) {
+  if (typeof body.detail === "string") {
+    return body.detail;
+  }
+
+  if (body.detail && typeof body.detail === "object") {
+    const parts = [
+      body.detail.phase,
+      body.detail.code,
+      body.detail.message ?? body.detail.clerk?.raw,
+    ].filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(": ");
+    }
+  }
+
+  return body.error ?? "Failed to create invite";
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from uuid import uuid4
 from datetime import UTC, datetime
 from time import perf_counter
@@ -14,6 +15,7 @@ from .db import control_plane_connection
 
 
 app = FastAPI(title="Zoe User Admin", version="0.1.0")
+logger = logging.getLogger("zoe-user-admin")
 
 
 @app.get("/health")
@@ -199,26 +201,78 @@ def create_org_invite(
         external_org_id = get_clerk_org_id(conn, identity["internal_org_id"])
         validate_role_ms = elapsed_ms(validate_role_started)
 
-        clerk_started = perf_counter()
-        invitation = create_clerk_org_invitation(
-            organization_id=external_org_id,
-            email_address=email_address,
-            zoe_role_key=zoe_role_key,
-            redirect_url=build_zoe_invitation_redirect_url(redirect_url, zoe_invitation_id),
+        logger.info(
+            "create_org_invite.start org=%s user=%s email=%s role=%s zoe_invitation_id=%s",
+            identity["internal_org_id"],
+            identity["internal_user_id"],
+            email_address,
+            zoe_role_key,
+            zoe_invitation_id,
         )
+
+        clerk_started = perf_counter()
+        try:
+            invitation = create_clerk_org_invitation(
+                organization_id=external_org_id,
+                email_address=email_address,
+                zoe_role_key=zoe_role_key,
+                redirect_url=build_zoe_invitation_redirect_url(redirect_url, zoe_invitation_id),
+            )
+        except HTTPException as exc:
+            logger.exception(
+                "create_org_invite.clerk_failed org=%s user=%s email=%s role=%s zoe_invitation_id=%s",
+                identity["internal_org_id"],
+                identity["internal_user_id"],
+                email_address,
+                zoe_role_key,
+                zoe_invitation_id,
+            )
+            raise add_phase_to_http_exception(exc, "clerk_create") from exc
         clerk_api_ms = elapsed_ms(clerk_started)
 
         persist_started = perf_counter()
-        persist_invitation(
-            conn,
-            zoe_invitation_id=zoe_invitation_id,
-            invitation=invitation,
-            clerk_org_id=external_org_id,
-            invited_email=email_address,
-            zoe_role_key=zoe_role_key,
-            created_by_internal_user_id=identity["internal_user_id"],
-            internal_org_id=identity["internal_org_id"],
-        )
+        try:
+            persist_invitation(
+                conn,
+                zoe_invitation_id=zoe_invitation_id,
+                invitation=invitation,
+                clerk_org_id=external_org_id,
+                invited_email=email_address,
+                zoe_role_key=zoe_role_key,
+                created_by_internal_user_id=identity["internal_user_id"],
+                internal_org_id=identity["internal_org_id"],
+            )
+        except HTTPException as exc:
+            logger.exception(
+                "create_org_invite.persist_failed org=%s user=%s email=%s role=%s zoe_invitation_id=%s clerk_invitation_id=%s",
+                identity["internal_org_id"],
+                identity["internal_user_id"],
+                email_address,
+                zoe_role_key,
+                zoe_invitation_id,
+                invitation.get("id"),
+            )
+            raise add_phase_to_http_exception(exc, "zoe_persist") from exc
+        except Exception as exc:
+            logger.exception(
+                "create_org_invite.persist_failed org=%s user=%s email=%s role=%s zoe_invitation_id=%s clerk_invitation_id=%s",
+                identity["internal_org_id"],
+                identity["internal_user_id"],
+                email_address,
+                zoe_role_key,
+                zoe_invitation_id,
+                invitation.get("id"),
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "zoe_invitation_persist_failed",
+                    "phase": "zoe_persist",
+                    "message": str(exc),
+                    "zoe_invitation_id": zoe_invitation_id,
+                    "clerk_invitation_id": invitation.get("id"),
+                },
+            ) from exc
         persist_ms = elapsed_ms(persist_started)
 
         response_build_started = perf_counter()
@@ -249,6 +303,15 @@ def create_org_invite(
         response["service_timings"][0]["timings"]["total_ms"] = round(
             pool_acquire_ms + owner_check_ms + validate_role_ms + clerk_api_ms + persist_ms + response_build_ms,
             2,
+        )
+        logger.info(
+            "create_org_invite.success org=%s user=%s email=%s role=%s zoe_invitation_id=%s clerk_invitation_id=%s",
+            identity["internal_org_id"],
+            identity["internal_user_id"],
+            email_address,
+            zoe_role_key,
+            zoe_invitation_id,
+            invitation.get("id"),
         )
     return response
 
@@ -629,3 +692,16 @@ def parse_optional_timestamp(value: Any) -> datetime | None:
 
 def elapsed_ms(started: float) -> float:
     return round((perf_counter() - started) * 1000, 2)
+
+
+def add_phase_to_http_exception(exc: HTTPException, phase: str) -> HTTPException:
+    if isinstance(exc.detail, dict):
+        return HTTPException(status_code=exc.status_code, detail={**exc.detail, "phase": phase})
+    return HTTPException(
+        status_code=exc.status_code,
+        detail={
+            "code": "invite_flow_error",
+            "phase": phase,
+            "message": str(exc.detail),
+        },
+    )
