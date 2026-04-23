@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 
 type UsersRolesPaneProps = {
@@ -17,10 +17,45 @@ const ROLE_OPTIONS = [
 
 export function UsersRolesPane({ userAdminBaseUrl }: UsersRolesPaneProps) {
   const auth = useAuth();
+  const [accessState, setAccessState] = useState<"loading" | "owner" | "forbidden" | "error">("loading");
   const [emailAddress, setEmailAddress] = useState("");
   const [roleKey, setRoleKey] = useState("attorney");
   const [inviteState, setInviteState] = useState<InviteState>("idle");
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAccess() {
+      try {
+        const token = await auth.getToken({ skipCache: true });
+        const response = await fetch(`${userAdminBaseUrl}/getOrgProperties`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (cancelled) return;
+
+        if (response.status === 403) {
+          setAccessState("forbidden");
+          return;
+        }
+
+        if (!response.ok) {
+          setAccessState("error");
+          return;
+        }
+
+        setAccessState("owner");
+      } catch {
+        if (!cancelled) setAccessState("error");
+      }
+    }
+
+    void checkAccess();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.getToken, userAdminBaseUrl]);
 
   const selectedRole = ROLE_OPTIONS.find((option) => option.value === roleKey) ?? ROLE_OPTIONS[1];
 
@@ -64,6 +99,33 @@ export function UsersRolesPane({ userAdminBaseUrl }: UsersRolesPaneProps) {
       setInviteState("error");
       setInviteMessage(error instanceof Error ? error.message : "Failed to create invite");
     }
+  }
+
+  if (accessState === "loading") {
+    return (
+      <section className="settings-panel">
+        <section className="settings-card">
+          <p className="status">Checking access…</p>
+        </section>
+      </section>
+    );
+  }
+
+  if (accessState !== "owner") {
+    return (
+      <section className="settings-panel">
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <h2>Users &amp; Roles</h2>
+              <p className="field-subtext users-roles-copy">
+                Only active owners can invite teammates or manage roles for this organization.
+              </p>
+            </div>
+          </div>
+        </section>
+      </section>
+    );
   }
 
   return (
