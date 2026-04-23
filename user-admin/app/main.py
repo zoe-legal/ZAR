@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from uuid import uuid4
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -192,6 +193,7 @@ def create_org_invite(
         email_address = required_payload_string(payload, "email_address")
         zoe_role_key = required_payload_string(payload, "role_key")
         redirect_url = optional_payload_string(payload, "redirect_url")
+        zoe_invitation_id = str(uuid4())
         validate_role_started = perf_counter()
         validate_role_exists(conn, zoe_role_key)
         external_org_id = get_clerk_org_id(conn, identity["internal_org_id"])
@@ -202,13 +204,14 @@ def create_org_invite(
             organization_id=external_org_id,
             email_address=email_address,
             zoe_role_key=zoe_role_key,
-            redirect_url=redirect_url,
+            redirect_url=build_zoe_invitation_redirect_url(redirect_url, zoe_invitation_id),
         )
         clerk_api_ms = elapsed_ms(clerk_started)
 
         persist_started = perf_counter()
         persist_invitation(
             conn,
+            zoe_invitation_id=zoe_invitation_id,
             invitation=invitation,
             clerk_org_id=external_org_id,
             invited_email=email_address,
@@ -220,6 +223,7 @@ def create_org_invite(
 
         response_build_started = perf_counter()
         response = {
+            "zoe_invitation_id": zoe_invitation_id,
             "id": invitation.get("id"),
             "email_address": invitation.get("email_address", email_address),
             "role": invitation.get("role"),
@@ -330,6 +334,7 @@ def get_org_display_name(conn: Any, internal_org_id: str) -> str:
 def persist_invitation(
     conn: Any,
     *,
+    zoe_invitation_id: str,
     invitation: dict[str, Any],
     clerk_org_id: str,
     invited_email: str,
@@ -344,6 +349,7 @@ def persist_invitation(
     conn.execute(
         """
         insert into zoe_onboarding.invitations (
+          zoe_invitation_id,
           clerk_invitation_id,
           invitation_type,
           clerk_org_id,
@@ -353,9 +359,10 @@ def persist_invitation(
           created_by_internal_user_id,
           valid_until
         )
-        values (%s, 'invite_to_org', %s, %s, %s, %s, %s::uuid, %s)
+        values (%s::uuid, %s, 'invite_to_org', %s, %s, %s, %s, %s::uuid, %s)
         on conflict (clerk_invitation_id)
         do update set
+          zoe_invitation_id = excluded.zoe_invitation_id,
           clerk_org_id = excluded.clerk_org_id,
           org_display_name = excluded.org_display_name,
           invited_email = excluded.invited_email,
@@ -364,13 +371,17 @@ def persist_invitation(
           valid_until = excluded.valid_until
         """,
         (
+            zoe_invitation_id,
             clerk_invitation_id,
             clerk_org_id,
             get_org_display_name(conn, internal_org_id),
             invited_email,
             zoe_role_key,
             created_by_internal_user_id,
-            parse_optional_timestamp(invitation.get("expires_at")),
+            parse_optional_timestamp(
+                invitation.get("expiresAt")
+                or invitation.get("expires_at")
+            ),
         ),
     )
 
@@ -549,6 +560,12 @@ def create_clerk_org_invitation(
         raise HTTPException(status_code=exc.code, detail={"code": "clerk_invitation_failed", "clerk": parsed}) from exc
 
 
+def build_zoe_invitation_redirect_url(base_redirect_url: str | None, zoe_invitation_id: str) -> str | None:
+    if not base_redirect_url:
+        return None
+    return f"{base_redirect_url.rstrip('/')}/{zoe_invitation_id}"
+
+
 def required_payload_string(payload: dict[str, str | None], key: str) -> str:
     value = optional_payload_string(payload, key)
     if value is None:
@@ -594,6 +611,12 @@ def cleaned(value: Any) -> str | None:
 
 
 def parse_optional_timestamp(value: Any) -> datetime | None:
+    if isinstance(value, (int, float)):
+        epoch = float(value)
+        if epoch > 1_000_000_000_000:
+            epoch = epoch / 1000.0
+        return datetime.fromtimestamp(epoch, tz=UTC)
+
     text = cleaned(value)
     if not text:
         return None

@@ -14,6 +14,15 @@ export function useInvitationDetails(search: string) {
     roleKey: null,
   });
   const [inviteStatus, setInviteStatus] = useState("");
+  const pathname = window.location.pathname;
+  const zoeInvitationId = useMemo(() => {
+    const prefix = "/accept-invitation/";
+    if (!pathname.startsWith(prefix)) {
+      return null;
+    }
+    const value = pathname.slice(prefix.length).trim();
+    return value || null;
+  }, [pathname]);
 
   const params = useMemo(() => {
     const next = new URLSearchParams(search);
@@ -53,16 +62,17 @@ export function useInvitationDetails(search: string) {
     let cancelled = false;
 
     async function loadInvitation() {
-      if (!invitationId) {
+      if (!zoeInvitationId && !invitationId) {
         setInviteStatus("");
         return;
       }
 
       try {
         setInviteStatus("Loading invitation details...");
-        const response = await fetch(
-          `${window.location.origin}/onboarding/getInvitationDetails?clerk_invitation_id=${encodeURIComponent(invitationId)}`
-        );
+        const lookupQuery = zoeInvitationId
+          ? `zoe_invitation_id=${encodeURIComponent(zoeInvitationId)}`
+          : `clerk_invitation_id=${encodeURIComponent(invitationId!)}`
+        const response = await fetch(`${window.location.origin}/onboarding/getInvitationDetails?${lookupQuery}`);
         const body = await response.json();
         if (!response.ok) {
           throw new Error(body.detail ?? body.error ?? "Invitation lookup failed");
@@ -84,13 +94,14 @@ export function useInvitationDetails(search: string) {
     return () => {
       cancelled = true;
     };
-  }, [invitationId]);
+  }, [invitationId, zoeInvitationId]);
 
   return {
     invitation,
     inviteStatus,
     params,
     ticket,
+    zoeInvitationId,
     invitationId,
     fallbackOrgDisplayName,
   };

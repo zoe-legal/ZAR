@@ -30,15 +30,17 @@ def health() -> dict[str, str]:
 
 @app.get("/getInvitationDetails")
 def get_invitation_details(
+    zoe_invitation_id: str | None = Query(default=None),
     clerk_invitation_id: str | None = Query(default=None),
 ) -> dict[str, Any]:
     total_started = perf_counter()
-    invitation_id = (clerk_invitation_id or "").strip()
-    if not invitation_id:
-        raise HTTPException(status_code=400, detail="clerk_invitation_id is required")
+    zoe_id = (zoe_invitation_id or "").strip()
+    clerk_id = (clerk_invitation_id or "").strip()
+    if not zoe_id and not clerk_id:
+        raise HTTPException(status_code=400, detail="zoe_invitation_id or clerk_invitation_id is required")
 
     lookup_started = perf_counter()
-    invitation = fetch_invitation(invitation_id)
+    invitation = fetch_invitation(zoe_id, clerk_id)
     lookup_ms = elapsed_ms(lookup_started)
     if not invitation:
         raise HTTPException(status_code=404, detail="invitation_not_found")
@@ -176,39 +178,61 @@ def get_status_row(user_id: str, org_id: str) -> dict[str, Any] | None:
     }
 
 
-def fetch_invitation(clerk_invitation_id: str) -> dict[str, Any] | None:
+def fetch_invitation(zoe_invitation_id: str | None, clerk_invitation_id: str | None) -> dict[str, Any] | None:
     with control_plane_connection() as conn:
-        row = conn.execute(
-            """
-            select
-              clerk_invitation_id,
-              invitation_type,
-              clerk_org_id,
-              org_display_name,
-              invited_email,
-              zoe_role_key,
-              valid_until,
-              accepted_at,
-              revoked_at
-            from zoe_onboarding.invitations
-            where clerk_invitation_id = %s
-            """,
-            (clerk_invitation_id,),
-        ).fetchone()
+        if zoe_invitation_id:
+            row = conn.execute(
+                """
+                select
+                  zoe_invitation_id::text,
+                  clerk_invitation_id,
+                  invitation_type,
+                  clerk_org_id,
+                  org_display_name,
+                  invited_email,
+                  zoe_role_key,
+                  valid_until,
+                  accepted_at,
+                  revoked_at
+                from zoe_onboarding.invitations
+                where zoe_invitation_id = %s::uuid
+                """,
+                (zoe_invitation_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                select
+                  zoe_invitation_id::text,
+                  clerk_invitation_id,
+                  invitation_type,
+                  clerk_org_id,
+                  org_display_name,
+                  invited_email,
+                  zoe_role_key,
+                  valid_until,
+                  accepted_at,
+                  revoked_at
+                from zoe_onboarding.invitations
+                where clerk_invitation_id = %s
+                """,
+                (clerk_invitation_id,),
+            ).fetchone()
 
     if row is None:
         return None
 
     return {
-        "clerk_invitation_id": row[0],
-        "invitation_type": row[1],
-        "clerk_org_id": row[2],
-        "org_display_name": row[3],
-        "invited_email": row[4],
-        "zoe_role_key": row[5],
-        "valid_until": row[6].isoformat() if row[6] else None,
-        "accepted_at": row[7].isoformat() if row[7] else None,
-        "revoked_at": row[8].isoformat() if row[8] else None,
+        "zoe_invitation_id": row[0],
+        "clerk_invitation_id": row[1],
+        "invitation_type": row[2],
+        "clerk_org_id": row[3],
+        "org_display_name": row[4],
+        "invited_email": row[5],
+        "zoe_role_key": row[6],
+        "valid_until": row[7].isoformat() if row[7] else None,
+        "accepted_at": row[8].isoformat() if row[8] else None,
+        "revoked_at": row[9].isoformat() if row[9] else None,
     }
 
 
