@@ -205,13 +205,15 @@ async function main() {
           return;
         }
 
+        let verifiedToken: Awaited<ReturnType<typeof verifyToken>>;
+        let authMs = 0;
         try {
           const totalStarted = performance.now();
           const authStarted = performance.now();
-          const verifiedToken = await verifyToken(token, {
+          verifiedToken = await verifyToken(token, {
             secretKey: config.clerk_secret_key,
           });
-          const authMs = elapsedMs(authStarted);
+          authMs = elapsedMs(authStarted);
           const clerkUserId = verifiedToken.sub;
           const clerkOrgId = clerkOrgIdFromToken(verifiedToken);
 
@@ -264,9 +266,20 @@ async function main() {
               total_ms: elapsedMs(totalStarted),
             },
           });
-        } catch {
-          console.warn(JSON.stringify({ event: "auth.session.invalid_token" }));
-          sendJson(res, 401, { error: "invalid_bearer_token" });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const isVerifyTokenError = /token|jwt|signature|issuer|audience|session/i.test(message);
+          if (isVerifyTokenError) {
+            console.warn(JSON.stringify({ event: "auth.session.invalid_token", message }));
+            sendJson(res, 401, { error: "invalid_bearer_token" });
+            return;
+          }
+          console.error(JSON.stringify({
+            event: "user_admin.proxy_error",
+            path: url.pathname,
+            message,
+          }));
+          sendJson(res, 502, { error: "user_admin_proxy_error", detail: message });
         }
         return;
       }
