@@ -1,9 +1,9 @@
-import { SignedIn, SignedOut, useSignIn, useSignUp } from "@clerk/clerk-react";
+import { useSignIn, useSignUp } from "@clerk/clerk-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useInvitationDetails } from "../hooks/useInvitationDetails";
 
 export function AcceptInvitationPage() {
-  const { invitation, inviteStatus, params, invitationId, fallbackOrgDisplayName } = useInvitationDetails(window.location.search);
+  const { invitation, inviteStatus, params, ticket, invitationId, fallbackOrgDisplayName } = useInvitationDetails(window.location.search);
   const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
   const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
   const clerkStatus = params.get("__clerk_status");
@@ -36,7 +36,6 @@ export function AcceptInvitationPage() {
     setIsSubmitting(true);
 
     try {
-      const ticket = params.get("__clerk_ticket") || params.get("ticket");
       if (!ticket) {
         throw new Error("No invitation ticket found.");
       }
@@ -68,6 +67,8 @@ export function AcceptInvitationPage() {
         console.log("[invite] signUp setActive complete", {
           createdSessionId: result.createdSessionId,
         });
+        window.sessionStorage.removeItem("zoe_invite_ticket");
+        window.sessionStorage.removeItem("zoe_invite_status");
         window.location.href = "/protected";
         return;
       }
@@ -75,13 +76,13 @@ export function AcceptInvitationPage() {
       if (!signInLoaded || !signIn || !setSignInActive) {
         throw new Error("Clerk sign-in is not ready.");
       }
-      console.log("[invite] signIn.create start", {
+      console.log("[invite] signIn.ticket start", {
         clerkStatus,
         invitationId,
         invitedEmail,
       });
       const result = await signIn.create({ strategy: "ticket", ticket });
-      console.log("[invite] signIn.create result", {
+      console.log("[invite] signIn.ticket result", {
         status: result.status,
         createdSessionId: result.createdSessionId ?? null,
         firstFactorVerification: "firstFactorVerification" in result ? result.firstFactorVerification : undefined,
@@ -90,9 +91,11 @@ export function AcceptInvitationPage() {
         throw new Error("Sign-in did not complete.");
       }
       await setSignInActive({ session: result.createdSessionId });
-      console.log("[invite] signIn setActive complete", {
+      console.log("[invite] signIn.ticket setActive complete", {
         createdSessionId: result.createdSessionId,
       });
+      window.sessionStorage.removeItem("zoe_invite_ticket");
+      window.sessionStorage.removeItem("zoe_invite_status");
       window.location.href = "/protected";
     } catch (error) {
       console.error("[invite] submit failed", error);
@@ -136,58 +139,58 @@ export function AcceptInvitationPage() {
         </div>
 
         <section className="invite-auth-card invite-auth-card-split">
-          <SignedOut>
-            <form className="invite-form" onSubmit={handleSubmit}>
-              <div className="invite-form-header">
-                <h2 className="invite-form-title">{mode === "signup" ? "Create your account" : "Sign in to Zoe"}</h2>
-                <p className="invite-copy">{title}</p>
-              </div>
-
-              {mode === "signin" && !canSignIn ? (
-                <p className="invite-error">
-                  This invitation is for a new Zoe account. Use sign up to continue.
-                </p>
-              ) : null}
-
-              {authError ? <p className="invite-error">{authError}</p> : null}
-
-              {invitedEmail ? (
-                <label className="invite-field">
-                  <span className="invite-field-label">Invited email</span>
-                  <input className="invite-input" value={invitedEmail} readOnly />
-                </label>
-              ) : null}
-
-              {mode === "signup" ? (
-                <label className="invite-field">
-                  <span className="invite-field-label">Create password</span>
-                  <input
-                    className="invite-input"
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Choose a password"
-                    required
-                  />
-                </label>
-              ) : null}
-
-              <button
-                type="submit"
-                className="button invite-submit"
-                disabled={isSubmitting || (mode === "signin" && !canSignIn) || (mode === "signup" && password.trim() === "")}
-              >
-                {isSubmitting ? "Working..." : mode === "signup" ? "Create account" : "Continue"}
-              </button>
-            </form>
-          </SignedOut>
-          <SignedIn>
-            <div className="invite-signed-in">
-              <p className="invite-signed-in-title">You&apos;re already signed in.</p>
-              <p className="invite-copy">Continue into the app and we&apos;ll finish setting up your organization access there.</p>
-              <a className="button" href="/protected">Continue</a>
+          <form className="invite-form" onSubmit={handleSubmit}>
+            <div className="invite-form-header">
+              <h2 className="invite-form-title">{mode === "signup" ? "Create your account" : "Sign in to Zoe"}</h2>
+              <p className="invite-copy">{title}</p>
             </div>
-          </SignedIn>
+
+            {mode === "signin" && !canSignIn ? (
+              <p className="invite-error">
+                This invitation is for a new Zoe account. Use sign up to continue.
+              </p>
+            ) : null}
+
+            {authError ? <p className="invite-error">{authError}</p> : null}
+
+            {invitedEmail ? (
+              <label className="invite-field">
+                <span className="invite-field-label">Invited email</span>
+                <input className="invite-input" value={invitedEmail} readOnly />
+              </label>
+            ) : null}
+
+            {mode === "signup" ? (
+              <label className="invite-field">
+                <span className="invite-field-label">Create password</span>
+                <input
+                  className="invite-input"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Choose a password"
+                  required
+                />
+              </label>
+            ) : null}
+
+            <button
+              type="submit"
+              className="button invite-submit"
+              disabled={
+                isSubmitting
+                || (mode === "signup" && password.trim() === "")
+              }
+            >
+              {isSubmitting ? "Working..." : mode === "signup" ? "Create account" : "Accept invitation and sign in"}
+            </button>
+
+            {mode === "signin" ? (
+              <p className="status">
+                {canSignIn ? "Continue to sign in as this invited user and accept the invitation." : "Switch to sign up to create a new Zoe account for this invite."}
+              </p>
+            ) : null}
+          </form>
         </section>
       </section>
     </main>

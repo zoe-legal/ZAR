@@ -15,7 +15,31 @@ export function useInvitationDetails(search: string) {
   });
   const [inviteStatus, setInviteStatus] = useState("");
 
-  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const params = useMemo(() => {
+    const next = new URLSearchParams(search);
+    const queryTicket = next.get("__clerk_ticket") || next.get("ticket");
+    const queryStatus = next.get("__clerk_status");
+
+    if (queryTicket) {
+      window.sessionStorage.setItem("zoe_invite_ticket", queryTicket);
+      if (queryStatus) {
+        window.sessionStorage.setItem("zoe_invite_status", queryStatus);
+      }
+      return next;
+    }
+
+    const storedTicket = window.sessionStorage.getItem("zoe_invite_ticket");
+    const storedStatus = window.sessionStorage.getItem("zoe_invite_status");
+    if (!storedTicket) {
+      return next;
+    }
+
+    next.set("__clerk_ticket", storedTicket);
+    if (storedStatus && !next.get("__clerk_status")) {
+      next.set("__clerk_status", storedStatus);
+    }
+    return next;
+  }, [search]);
   const ticket = params.get("__clerk_ticket") || params.get("ticket");
   const invitationId = extractInvitationId(ticket);
   const fallbackOrgDisplayName =
@@ -66,6 +90,7 @@ export function useInvitationDetails(search: string) {
     invitation,
     inviteStatus,
     params,
+    ticket,
     invitationId,
     fallbackOrgDisplayName,
   };
