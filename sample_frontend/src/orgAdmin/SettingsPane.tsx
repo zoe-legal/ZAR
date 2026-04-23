@@ -73,6 +73,7 @@ export function SettingsPane({ userAdminBaseUrl }: SettingsPaneProps) {
   const [saved, setSaved] = useState<Record<string, SaveState>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
   const savedRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
@@ -81,9 +82,19 @@ export function SettingsPane({ userAdminBaseUrl }: SettingsPaneProps) {
     async function load() {
       try {
         const token = await auth.getToken({ skipCache: true });
+        if (!token) {
+          throw new Error("Authentication token is unavailable. Please sign in again.");
+        }
         const response = await fetch(`${userAdminBaseUrl}/getOrgProperties`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (response.status === 403) {
+          if (!cancelled) {
+            setForbidden(true);
+            setError(null);
+          }
+          return;
+        }
         const body = await response.json() as Record<string, PropEntry | unknown>;
         if (!response.ok) throw new Error((body as { error?: string }).error ?? "Failed to load");
         if (cancelled) return;
@@ -110,7 +121,10 @@ export function SettingsPane({ userAdminBaseUrl }: SettingsPaneProps) {
     if (value === savedRef.current[key]) return;
     setSaved((s) => ({ ...s, [key]: "saving" }));
     try {
-      const token = await auth.getToken();
+      const token = await auth.getToken({ skipCache: true });
+      if (!token) {
+        throw new Error("Authentication token is unavailable. Please sign in again.");
+      }
       const response = await fetch(`${userAdminBaseUrl}/putOrgProperties`, {
         method: "PUT",
         headers: {
@@ -177,6 +191,22 @@ export function SettingsPane({ userAdminBaseUrl }: SettingsPaneProps) {
   }
 
   if (loading) return <section className="settings-panel"><p className="status">Loading...</p></section>;
+  if (forbidden) {
+    return (
+      <section className="settings-panel">
+        <section className="settings-card">
+          <div className="settings-card-header">
+            <div>
+              <h2>Org Settings</h2>
+              <p className="field-subtext">
+                Only active owners can edit organization settings for this organization.
+              </p>
+            </div>
+          </div>
+        </section>
+      </section>
+    );
+  }
   if (error) return <section className="settings-panel"><p className="status">{error}</p></section>;
 
   const orgDisplayName = values["company_display_name"] || values["company_name"] || "";
