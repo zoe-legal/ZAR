@@ -222,18 +222,6 @@ button:hover,
   border-radius: 12px;
 }
 
-.invite-auth-card .cl-rootBox,
-.invite-auth-card .cl-cardBox,
-.invite-auth-card .cl-card {
-  width: 100%;
-  max-width: 100%;
-}
-
-.invite-auth-card .cl-card {
-  box-shadow: none;
-  border: none;
-}
-
 .invite-signed-in {
   display: grid;
   gap: 12px;
@@ -248,6 +236,74 @@ button:hover,
 .invite-signed-out {
   display: grid;
   gap: 12px;
+}
+
+.invite-form {
+  display: grid;
+  gap: 18px;
+}
+
+.invite-form-header {
+  display: grid;
+  gap: 8px;
+}
+
+.invite-form-title {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #1a1a1a;
+}
+
+.invite-field {
+  display: grid;
+  gap: 8px;
+}
+
+.invite-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8f98;
+}
+
+.invite-input {
+  width: 100%;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font: inherit;
+  padding: 12px 14px;
+}
+
+.invite-input[readonly] {
+  background: #f7f8f8;
+  color: #6f7680;
+}
+
+.invite-submit {
+  width: 100%;
+  justify-content: center;
+  padding-block: 12px;
+}
+
+.invite-submit:disabled,
+.invite-mode-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.invite-error {
+  padding: 12px 14px;
+  border: 1px solid #f4b4b4;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #b42318;
+  font-size: 0.9375rem;
+  line-height: 1.45;
 }
 
 .invite-signed-in-title {
