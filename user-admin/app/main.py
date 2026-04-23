@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
 from urllib import error, request
@@ -205,6 +206,18 @@ def create_org_invite(
         )
         clerk_api_ms = elapsed_ms(clerk_started)
 
+        persist_started = perf_counter()
+        persist_invitation(
+            conn,
+            invitation=invitation,
+            clerk_org_id=external_org_id,
+            invited_email=email_address,
+            zoe_role_key=zoe_role_key,
+            created_by_internal_user_id=identity["internal_user_id"],
+            internal_org_id=identity["internal_org_id"],
+        )
+        persist_ms = elapsed_ms(persist_started)
+
         response_build_started = perf_counter()
         response = {
             "id": invitation.get("id"),
@@ -221,6 +234,7 @@ def create_org_invite(
                     "owner_check_ms": owner_check_ms,
                     "resolve_context_ms": validate_role_ms,
                     "clerk_api_ms": clerk_api_ms,
+                    "persist_ms": persist_ms,
                     "response_build_ms": 0.0,
                     "total_ms": 0.0,
                 },
@@ -229,7 +243,7 @@ def create_org_invite(
         response_build_ms = elapsed_ms(response_build_started)
         response["service_timings"][0]["timings"]["response_build_ms"] = response_build_ms
         response["service_timings"][0]["timings"]["total_ms"] = round(
-            pool_acquire_ms + owner_check_ms + validate_role_ms + clerk_api_ms + response_build_ms,
+            pool_acquire_ms + owner_check_ms + validate_role_ms + clerk_api_ms + persist_ms + response_build_ms,
             2,
         )
     return response
@@ -290,6 +304,75 @@ def get_clerk_org_id(conn: Any, internal_org_id: str) -> str:
     if row is None:
         raise HTTPException(status_code=500, detail="clerk_org_mapping_missing")
     return row[0]
+
+
+def get_org_display_name(conn: Any, internal_org_id: str) -> str:
+    row = conn.execute(
+        """
+        select property_value_text
+        from zoe_customer_details.company_properties
+        where internal_org_id = %s::uuid
+          and property_key in ('company_display_name', 'company_name')
+        order by case property_key
+          when 'company_display_name' then 0
+          when 'company_name' then 1
+          else 2
+        end
+        limit 1
+        """,
+        (internal_org_id,),
+    ).fetchone()
+    if row and isinstance(row[0], str) and row[0].strip():
+        return row[0].strip()
+    raise HTTPException(status_code=500, detail="org_display_name_missing")
+
+
+def persist_invitation(
+    conn: Any,
+    *,
+    invitation: dict[str, Any],
+    clerk_org_id: str,
+    invited_email: str,
+    zoe_role_key: str,
+    created_by_internal_user_id: str,
+    internal_org_id: str,
+) -> None:
+    clerk_invitation_id = cleaned(invitation.get("id"))
+    if not clerk_invitation_id:
+        raise HTTPException(status_code=500, detail="clerk_invitation_id_missing")
+
+    conn.execute(
+        """
+        insert into zoe_onboarding.invitations (
+          clerk_invitation_id,
+          invitation_type,
+          clerk_org_id,
+          org_display_name,
+          invited_email,
+          zoe_role_key,
+          created_by_internal_user_id,
+          valid_until
+        )
+        values (%s, 'invite_to_org', %s, %s, %s, %s, %s::uuid, %s)
+        on conflict (clerk_invitation_id)
+        do update set
+          clerk_org_id = excluded.clerk_org_id,
+          org_display_name = excluded.org_display_name,
+          invited_email = excluded.invited_email,
+          zoe_role_key = excluded.zoe_role_key,
+          created_by_internal_user_id = excluded.created_by_internal_user_id,
+          valid_until = excluded.valid_until
+        """,
+        (
+            clerk_invitation_id,
+            clerk_org_id,
+            get_org_display_name(conn, internal_org_id),
+            invited_email,
+            zoe_role_key,
+            created_by_internal_user_id,
+            parse_optional_timestamp(invitation.get("expires_at")),
+        ),
+    )
 
 
 def fetch_user_properties(conn: Any, internal_org_id: str, internal_user_id: str) -> dict[str, Any]:
@@ -500,6 +583,25 @@ def ensure_all_keys_defined(updates: dict[str, str], definitions: dict[str, str]
     missing = sorted(set(updates.keys()) - set(definitions.keys()))
     if missing:
         raise HTTPException(status_code=400, detail=f"unknown property keys: {', '.join(missing)}")
+
+
+def cleaned(value: Any) -> str | None:
+    if isinstance(value, str):
+        trimmed = value.strip()
+        if trimmed:
+            return trimmed
+    return None
+
+
+def parse_optional_timestamp(value: Any) -> datetime | None:
+    text = cleaned(value)
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def elapsed_ms(started: float) -> float:

@@ -28,6 +28,34 @@ def health() -> dict[str, str]:
     }
 
 
+@app.get("/getInvitationDetails")
+def get_invitation_details(
+    clerk_invitation_id: str | None = Query(default=None),
+) -> dict[str, Any]:
+    total_started = perf_counter()
+    invitation_id = (clerk_invitation_id or "").strip()
+    if not invitation_id:
+        raise HTTPException(status_code=400, detail="clerk_invitation_id is required")
+
+    lookup_started = perf_counter()
+    invitation = fetch_invitation(invitation_id)
+    lookup_ms = elapsed_ms(lookup_started)
+    if not invitation:
+        raise HTTPException(status_code=404, detail="invitation_not_found")
+
+    return {
+        **invitation,
+        "service_timings": [{
+            "service": "zoe-onboarding",
+            "endpoint": "/getInvitationDetails",
+            "timings": {
+                "zoe_onboarding_neon_ms": lookup_ms,
+                "total_ms": elapsed_ms(total_started),
+            },
+        }],
+    }
+
+
 @app.get("/getInternalUserAndOrg")
 def get_internal_user_and_org(
     clerk_user_id: str | None = Query(default=None),
@@ -145,6 +173,42 @@ def get_status_row(user_id: str, org_id: str) -> dict[str, Any] | None:
         "needs_onboarding": row[2],
         "is_onboarded": row[3],
         "updated_at": row[4],
+    }
+
+
+def fetch_invitation(clerk_invitation_id: str) -> dict[str, Any] | None:
+    with control_plane_connection() as conn:
+        row = conn.execute(
+            """
+            select
+              clerk_invitation_id,
+              invitation_type,
+              clerk_org_id,
+              org_display_name,
+              invited_email,
+              zoe_role_key,
+              valid_until,
+              accepted_at,
+              revoked_at
+            from zoe_onboarding.invitations
+            where clerk_invitation_id = %s
+            """,
+            (clerk_invitation_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "clerk_invitation_id": row[0],
+        "invitation_type": row[1],
+        "clerk_org_id": row[2],
+        "org_display_name": row[3],
+        "invited_email": row[4],
+        "zoe_role_key": row[5],
+        "valid_until": row[6].isoformat() if row[6] else None,
+        "accepted_at": row[7].isoformat() if row[7] else None,
+        "revoked_at": row[8].isoformat() if row[8] else None,
     }
 
 
