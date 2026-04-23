@@ -106,7 +106,7 @@ function AcceptInvitationPage() {
 
   const params = new URLSearchParams(window.location.search);
   const mode = params.get("mode") === "signup" ? "signup" : "signin";
-  const ticket = params.get("ticket");
+  const ticket = params.get("__clerk_ticket") || params.get("ticket");
   const invitationId = extractInvitationId(ticket);
   const fallbackOrgDisplayName =
     params.get("organization_name")
@@ -155,6 +155,7 @@ function AcceptInvitationPage() {
 
   const signInHref = buildAcceptInvitationHref("signin", params);
   const signUpHref = buildAcceptInvitationHref("signup", params);
+  const authTargetHref = mode === "signup" ? signUpHref : signInHref;
 
   return (
     <main className="page invite-page">
@@ -187,21 +188,17 @@ function AcceptInvitationPage() {
 
         <section className="invite-auth-card">
           <SignedOut>
-            {mode === "signup" ? (
-              <SignUp
-                routing="path"
-                path="/accept-invitation"
-                signInUrl={signInHref}
-                forceRedirectUrl="/protected"
-              />
-            ) : (
-              <SignIn
-                routing="path"
-                path="/accept-invitation"
-                signUpUrl={signUpHref}
-                forceRedirectUrl="/protected"
-              />
-            )}
+            <div className="invite-signed-out">
+              <p className="invite-signed-in-title">
+                {mode === "signup" ? "Create your account to accept the invite." : "Sign in to accept the invite."}
+              </p>
+              <p className="invite-copy">
+                We&apos;ll carry this invitation through to Clerk and continue after authentication.
+              </p>
+              <a className="button" href={authTargetHref}>
+                {mode === "signup" ? "Continue to sign up" : "Continue to sign in"}
+              </a>
+            </div>
           </SignedOut>
           <SignedIn>
             <div className="invite-signed-in">
@@ -412,13 +409,13 @@ function delay(ms: number) {
 
 function buildAcceptInvitationHref(mode: "signin" | "signup", params: URLSearchParams) {
   const next = new URLSearchParams(params);
+  next.delete("mode");
+  const ticket = next.get("__clerk_ticket") || next.get("ticket");
+  const ticketQuery = ticket ? `__clerk_ticket=${encodeURIComponent(ticket)}` : "";
   if (mode === "signup") {
-    next.set("mode", "signup");
-  } else {
-    next.delete("mode");
+    return ticketQuery ? `/signup?${ticketQuery}` : "/signup";
   }
-  const query = next.toString();
-  return query ? `/accept-invitation?${query}` : "/accept-invitation";
+  return ticketQuery ? `/login?${ticketQuery}` : "/login";
 }
 
 function extractInvitationId(ticket: string | null) {
