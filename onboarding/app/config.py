@@ -34,9 +34,7 @@ def _first_string(payload: dict[str, Any], keys: tuple[str, ...], label: str) ->
 class Settings:
     aws_region: str
     control_plane_secret_id: str
-    onboarding_database_secret_id: str
     control_plane_database_url: str
-    onboarding_database_url: str
     port: int = 8790
 
 
@@ -57,25 +55,16 @@ def _read_secret(secret_id: str, region: str) -> dict[str, Any]:
 def get_settings() -> Settings:
     aws_region = _required_env("AWS_REGION")
     control_plane_secret_id = _required_env("CONTROL_PLANE_SECRET_ID")
-    onboarding_database_secret_id = _required_env("ONBOARDING_DATABASE_SECRET_ID")
 
     control_plane_secret = _read_secret(control_plane_secret_id, aws_region)
-    onboarding_secret = _read_secret(onboarding_database_secret_id, aws_region)
 
     return Settings(
         aws_region=aws_region,
         control_plane_secret_id=control_plane_secret_id,
-        onboarding_database_secret_id=onboarding_database_secret_id,
         control_plane_database_url=_first_string(
             control_plane_secret,
             ("zoe_control_plane_database_url", "control_plane_database_url", "database_url"),
             "control plane database url",
         ),
-        onboarding_database_url=_first_string(
-            onboarding_secret,
-            ("zar_onboarding_db_url", "onboarding_database_url", "database_url"),
-            "onboarding database url",
-        ),
         port=int(os.getenv("PORT", "8790")),
     )
-

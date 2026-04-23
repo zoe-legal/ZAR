@@ -4,15 +4,12 @@ import { Webhook } from "svix";
 import { loadRuntimeConfig } from "./config.js";
 import { bootstrapOpenFga, checkFgaAllowed, fetchOrgEntitlements, resolveInternalIdentity } from "./lib/authz/pipeline.js";
 import { createControlPlaneDb } from "./lib/db/controlPlaneDb.js";
-import { createOnboardingDb } from "./lib/db/onboardingDb.js";
 import {
-  maybeTriggerOrganizationMembershipOnboarding,
-  storeClerkWebhookEvent,
+  processClerkWebhookEvent,
 } from "./lib/onboarding/events.js";
 
 async function main() {
   const config = await loadRuntimeConfig();
-  const onboardingDb = createOnboardingDb(config.onboarding_database_url);
   const controlPlaneDb = createControlPlaneDb(config.control_plane_database_url);
   const clerkWebhook = new Webhook(config.clerk_webhook_signing_secret);
   const onboardingServiceUrl = process.env.ONBOARDING_SERVICE_URL ?? "http://localhost:8790";
@@ -35,7 +32,7 @@ async function main() {
           service: "zar-backend",
           auth_provider: "clerk",
           secret_source: "aws_secrets_manager",
-          onboarding_db: "neon",
+          onboarding_db: "zoe_control_plane/zoe_onboarding",
         });
         return;
       }
@@ -291,27 +288,29 @@ async function main() {
           clerk_event_id: event.id ?? null,
           clerk_event_type: event.type ?? null,
         }));
-        const stored = await storeClerkWebhookEvent(onboardingDb, event);
+        const processed = await processClerkWebhookEvent(controlPlaneDb, event);
         console.info(JSON.stringify({
           event: "webhook.clerk.stored",
           clerk_event_id: event.id ?? null,
-          stored: stored.stored,
-          user_id: stored.userId,
-          org_id: stored.orgId,
+          stored: processed.stored,
+          user_id: processed.userId,
+          org_id: processed.orgId,
         }));
-        const greenfield = await maybeTriggerOrganizationMembershipOnboarding(onboardingDb, event);
         console.info(JSON.stringify({
           event: "greenfield.trigger.checked",
           clerk_event_id: event.id ?? null,
-          triggered: greenfield.triggered,
-          reason: greenfield.reason,
+          triggered: processed.triggered,
+          reason: processed.reason,
         }));
         sendJson(res, 200, {
           ok: true,
-          event_stored: stored.stored,
-          user_id: stored.userId,
-          org_id: stored.orgId,
-          greenfield,
+          event_stored: processed.stored,
+          user_id: processed.userId,
+          org_id: processed.orgId,
+          greenfield: {
+            triggered: processed.triggered,
+            reason: processed.reason,
+          },
         });
         return;
       }
@@ -331,7 +330,6 @@ async function main() {
   });
 
   const shutdown = async () => {
-    await onboardingDb.end();
     await controlPlaneDb.end();
     server.close();
   };

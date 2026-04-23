@@ -8,13 +8,11 @@ import {
 export type SecretLocatorConfig = {
   aws_region: string;
   clerk_secret_id: string;
-  onboarding_database_secret_id: string;
 };
 
 export type RuntimeConfig = SecretLocatorConfig & {
   clerk_secret_key: string;
   clerk_webhook_signing_secret: string;
-  onboarding_database_url: string;
   control_plane_database_url: string;
   port: number;
 };
@@ -23,7 +21,6 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   const locator = readSecretLocatorConfig();
   const client = new SecretsManagerClient({ region: locator.aws_region });
   const clerkSecret = await readSecretJson(client, locator.clerk_secret_id);
-  const onboardingDbSecret = await readSecretJson(client, locator.onboarding_database_secret_id);
 
   return {
     ...locator,
@@ -39,10 +36,6 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       ),
       "secret.control_plane_database_url"
     ),
-    onboarding_database_url: requiredString(
-      onboardingDbSecret.zar_onboarding_db_url,
-      "secret.zar_onboarding_db_url"
-    ),
     port: 8788,
   };
 }
@@ -53,10 +46,6 @@ function readSecretLocatorConfig(): SecretLocatorConfig {
   return {
     aws_region: requiredString(parsed.aws_region, "config.aws_region"),
     clerk_secret_id: requiredString(parsed.clerk_secret_id, "config.clerk_secret_id"),
-    onboarding_database_secret_id: requiredString(
-      parsed.onboarding_database_secret_id,
-      "config.onboarding_database_secret_id"
-    ),
   };
 }
 

@@ -11,21 +11,9 @@ from .config import get_settings
 
 
 @lru_cache(maxsize=1)
-def get_onboarding_pool() -> ConnectionPool:
-    settings = get_settings()
-    return ConnectionPool(conninfo=settings.onboarding_database_url, min_size=1, max_size=10, open=True)
-
-
-@lru_cache(maxsize=1)
 def get_control_plane_pool() -> ConnectionPool:
     settings = get_settings()
     return ConnectionPool(conninfo=settings.control_plane_database_url, min_size=1, max_size=10, open=True)
-
-
-@contextmanager
-def onboarding_connection() -> Iterator[Connection]:
-    with get_onboarding_pool().connection() as conn:
-        yield conn
 
 
 @contextmanager

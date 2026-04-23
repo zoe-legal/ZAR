@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Query
 
 from .config import get_settings
-from .db import control_plane_connection, onboarding_connection
+from .db import control_plane_connection
 
 
 PENDING_WINDOW = timedelta(seconds=60)
@@ -50,7 +50,7 @@ def get_internal_user_and_org(
     if effective_org_id:
         status_started = perf_counter()
         status_row = get_status_row(user_id, effective_org_id)
-        timing_values["onboarding_neon_ms"] = elapsed_ms(status_started)
+        timing_values["zoe_onboarding_neon_ms"] = elapsed_ms(status_started)
 
     if status_row and truthy(status_row["is_onboarded"]):
         mapping_started = perf_counter()
@@ -85,7 +85,10 @@ def get_internal_user_and_org(
     if status_row is None:
         status_started = perf_counter()
         status_row = get_status_row(user_id, effective_org_id)
-        timing_values["onboarding_neon_ms"] = round(timing_values.get("onboarding_neon_ms", 0.0) + elapsed_ms(status_started), 2)
+        timing_values["zoe_onboarding_neon_ms"] = round(
+            timing_values.get("zoe_onboarding_neon_ms", 0.0) + elapsed_ms(status_started),
+            2,
+        )
         if status_row and truthy(status_row["is_onboarded"]):
             mapping_started = perf_counter()
             internal = get_existing_internal_mapping(user_id, effective_org_id)
@@ -117,7 +120,7 @@ def get_internal_user_and_org(
 
 
 def get_status_row(user_id: str, org_id: str) -> dict[str, Any] | None:
-    with onboarding_connection() as conn:
+    with control_plane_connection() as conn:
         row = conn.execute(
             """
             select
@@ -126,7 +129,7 @@ def get_status_row(user_id: str, org_id: str) -> dict[str, Any] | None:
               needs_onboarding,
               is_onboarded,
               updated_at
-            from onboarding.status
+            from zoe_onboarding.status
             where user_id = %s
               and org_id = %s
             """,
@@ -186,7 +189,7 @@ def get_existing_internal_mapping(user_id: str, org_id: str | None) -> dict[str,
 
 
 def get_latest_membership_event(user_id: str, org_id: str | None) -> dict[str, Any] | None:
-    with onboarding_connection() as conn:
+    with control_plane_connection() as conn:
         if org_id:
             row = conn.execute(
                 """
@@ -195,7 +198,7 @@ def get_latest_membership_event(user_id: str, org_id: str | None) -> dict[str, A
                   org_id,
                   event_time,
                   event_dict
-                from onboarding.events
+                from zoe_onboarding.events
                 where user_id = %s
                   and org_id = %s
                   and event_type = 'organizationMembership.created'
@@ -212,7 +215,7 @@ def get_latest_membership_event(user_id: str, org_id: str | None) -> dict[str, A
                   org_id,
                   event_time,
                   event_dict
-                from onboarding.events
+                from zoe_onboarding.events
                 where user_id = %s
                   and event_type = 'organizationMembership.created'
                 order by event_time desc, received_at desc
@@ -393,12 +396,9 @@ def provision_greenfield_user(user_id: str, org_id: str, event_dict: dict[str, A
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_display_name", person["display_name"])
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_email", person["email"])
             grant_all_org_entitlements(conn, internal_org_id)
-
-    with onboarding_connection() as conn:
-        with conn.transaction():
             conn.execute(
                 """
-                insert into onboarding.status (
+                insert into zoe_onboarding.status (
                   user_id,
                   org_id,
                   needs_onboarding,
@@ -481,12 +481,9 @@ def provision_invited_user(user_id: str, org_id: str, event_dict: dict[str, Any]
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_last_name", person["last_name"])
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_display_name", person["display_name"])
             upsert_user_property(conn, internal_org_id, internal_user_id, "user_email", person["email"])
-
-    with onboarding_connection() as conn:
-        with conn.transaction():
             conn.execute(
                 """
-                insert into onboarding.status (
+                insert into zoe_onboarding.status (
                   user_id,
                   org_id,
                   needs_onboarding,

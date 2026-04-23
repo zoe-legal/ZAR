@@ -1,4 +1,4 @@
-import type { OnboardingDb } from "../db/onboardingDb.js";
+import type { ControlPlaneDb } from "../db/controlPlaneDb.js";
 
 type ClerkWebhookEvent = {
   id?: string;
@@ -25,7 +25,7 @@ type MembershipData = {
 };
 
 export async function storeClerkWebhookEvent(
-  db: OnboardingDb,
+  db: ControlPlaneDb,
   event: ClerkWebhookEvent
 ): Promise<{ stored: boolean; userId: string | null; orgId: string | null }> {
   const eventType = stringOrThrow(event.type, "event.type");
@@ -34,7 +34,7 @@ export async function storeClerkWebhookEvent(
   const ids = extractEventIds(event);
 
   const result = await db.query(
-    `insert into onboarding.events (
+    `insert into zoe_onboarding.events (
        event_id,
        event_source,
        user_id,
@@ -62,7 +62,7 @@ export async function storeClerkWebhookEvent(
 }
 
 export async function maybeTriggerOrganizationMembershipOnboarding(
-  db: OnboardingDb,
+  db: ControlPlaneDb,
   event: ClerkWebhookEvent
 ): Promise<{ triggered: boolean; reason: string }> {
   if (event.type !== "organizationMembership.created") {
@@ -78,7 +78,7 @@ export async function maybeTriggerOrganizationMembershipOnboarding(
   }
 
   await db.query(
-    `insert into onboarding.status (
+    `insert into zoe_onboarding.status (
        user_id,
        org_id,
        needs_onboarding,
@@ -87,7 +87,7 @@ export async function maybeTriggerOrganizationMembershipOnboarding(
      on conflict (user_id, org_id) do update
        set
            needs_onboarding = case
-             when onboarding.status.is_onboarded then false
+             when zoe_onboarding.status.is_onboarded then false
              else true
            end,
            updated_at = now()`,
@@ -95,6 +95,82 @@ export async function maybeTriggerOrganizationMembershipOnboarding(
   );
 
   return { triggered: true, reason: "membership_status_upserted" };
+}
+
+export async function processClerkWebhookEvent(
+  db: ControlPlaneDb,
+  event: ClerkWebhookEvent
+): Promise<{
+  stored: boolean;
+  userId: string | null;
+  orgId: string | null;
+  triggered: boolean;
+  reason: string;
+}> {
+  const eventType = stringOrThrow(event.type, "event.type");
+  const eventId = deriveEventId(event, eventType);
+  const eventTime = deriveEventTime(event);
+  const ids = extractEventIds(event);
+  const shouldTrigger = event.type === "organizationMembership.created" && ids.userId && ids.orgId;
+
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+
+    const result = await client.query(
+      `insert into zoe_onboarding.events (
+         event_id,
+         event_source,
+         user_id,
+         org_id,
+         event_type,
+         event_time,
+         event_dict
+       ) values ($1, 'clerk', $2, $3, $4, $5, $6)
+       on conflict (event_id) do nothing`,
+      [
+        eventId,
+        ids.userId ?? "unknown",
+        ids.orgId,
+        eventType,
+        eventTime,
+        event,
+      ]
+    );
+
+    if (shouldTrigger) {
+      await client.query(
+        `insert into zoe_onboarding.status (
+           user_id,
+           org_id,
+           needs_onboarding,
+           is_onboarded
+         ) values ($1, $2, true, false)
+         on conflict (user_id, org_id) do update
+           set
+               needs_onboarding = case
+                 when zoe_onboarding.status.is_onboarded then false
+                 else true
+               end,
+               updated_at = now()`,
+        [ids.userId, ids.orgId]
+      );
+    }
+
+    await client.query("commit");
+    return {
+      stored: result.rowCount === 1,
+      userId: ids.userId,
+      orgId: ids.orgId,
+      triggered: Boolean(shouldTrigger),
+      reason: shouldTrigger ? "membership_status_upserted" : "event_type_not_membership_trigger",
+    };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function extractEventIds(event: ClerkWebhookEvent): { userId: string | null; orgId: string | null } {
