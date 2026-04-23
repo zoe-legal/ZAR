@@ -93,14 +93,68 @@ function SignupPage() {
 }
 
 function AcceptInvitationPage() {
+  const [invitation, setInvitation] = useState<{
+    orgDisplayName: string | null;
+    invitedEmail: string | null;
+    roleKey: string | null;
+  }>({
+    orgDisplayName: null,
+    invitedEmail: null,
+    roleKey: null,
+  });
+  const [inviteStatus, setInviteStatus] = useState<string>("");
+
   const params = new URLSearchParams(window.location.search);
   const mode = params.get("mode") === "signup" ? "signup" : "signin";
-  const orgDisplayName =
+  const ticket = params.get("ticket");
+  const invitationId = extractInvitationId(ticket);
+  const fallbackOrgDisplayName =
     params.get("organization_name")
     || params.get("organizationName")
     || params.get("org_name")
     || params.get("org")
-    || "this organization";
+    || null;
+  const orgDisplayName = invitation.orgDisplayName || fallbackOrgDisplayName || "this organization";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInvitation() {
+      if (!invitationId) {
+        setInviteStatus("");
+        return;
+      }
+
+      try {
+        setInviteStatus("Loading invitation details...");
+        const response = await fetch(
+          `${window.location.origin}/onboarding/getInvitationDetails?clerk_invitation_id=${encodeURIComponent(invitationId)}`
+        );
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.detail ?? body.error ?? "Invitation lookup failed");
+        }
+        if (cancelled) return;
+        setInvitation({
+          orgDisplayName: typeof body.org_display_name === "string" ? body.org_display_name : null,
+          invitedEmail: typeof body.invited_email === "string" ? body.invited_email : null,
+          roleKey: typeof body.zoe_role_key === "string" ? body.zoe_role_key : null,
+        });
+        setInviteStatus("");
+      } catch (error) {
+        if (cancelled) return;
+        setInviteStatus(error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    void loadInvitation();
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationId]);
+
+  const signInHref = buildAcceptInvitationHref("signin", params);
+  const signUpHref = buildAcceptInvitationHref("signup", params);
 
   return (
     <main className="page invite-page">
@@ -111,16 +165,20 @@ function AcceptInvitationPage() {
           <p className="invite-copy">
             Sign in if you already have an account, or create one below to join the organization.
           </p>
+          {invitation.invitedEmail ? (
+            <p className="status">Invitation for {invitation.invitedEmail}{invitation.roleKey ? ` as ${invitation.roleKey}.` : "."}</p>
+          ) : null}
+          {inviteStatus ? <p className="status">{inviteStatus}</p> : null}
           <div className="invite-mode-toggle">
             <a
               className={mode === "signin" ? "invite-mode-button invite-mode-button-active" : "invite-mode-button"}
-              href="/accept-invitation"
+              href={signInHref}
             >
               Sign in
             </a>
             <a
               className={mode === "signup" ? "invite-mode-button invite-mode-button-active" : "invite-mode-button"}
-              href="/accept-invitation?mode=signup"
+              href={signUpHref}
             >
               Sign up
             </a>
@@ -133,14 +191,14 @@ function AcceptInvitationPage() {
               <SignUp
                 routing="path"
                 path="/accept-invitation"
-                signInUrl="/accept-invitation"
+                signInUrl={signInHref}
                 forceRedirectUrl="/protected"
               />
             ) : (
               <SignIn
                 routing="path"
                 path="/accept-invitation"
-                signUpUrl="/accept-invitation?mode=signup"
+                signUpUrl={signUpHref}
                 forceRedirectUrl="/protected"
               />
             )}
@@ -350,4 +408,33 @@ function delay(ms: number) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function buildAcceptInvitationHref(mode: "signin" | "signup", params: URLSearchParams) {
+  const next = new URLSearchParams(params);
+  if (mode === "signup") {
+    next.set("mode", "signup");
+  } else {
+    next.delete("mode");
+  }
+  const query = next.toString();
+  return query ? `/accept-invitation?${query}` : "/accept-invitation";
+}
+
+function extractInvitationId(ticket: string | null) {
+  if (!ticket) return null;
+  try {
+    const payloadSegment = ticket.split(".")[1];
+    if (!payloadSegment) return null;
+    const payload = JSON.parse(base64UrlDecode(payloadSegment)) as Record<string, unknown>;
+    return typeof payload.sid === "string" ? payload.sid : null;
+  } catch {
+    return null;
+  }
+}
+
+function base64UrlDecode(value: string) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+  return window.atob(normalized + padding);
 }
