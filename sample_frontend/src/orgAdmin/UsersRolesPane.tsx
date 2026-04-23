@@ -64,7 +64,10 @@ export function UsersRolesPane({ userAdminBaseUrl }: UsersRolesPaneProps) {
     setInviteMessage(null);
 
     try {
-      const token = await auth.getToken();
+      const token = await auth.getToken({ skipCache: true });
+      if (!token) {
+        throw new Error("Authentication token is unavailable. Please sign in again.");
+      }
       const response = await fetch(`${userAdminBaseUrl}/createOrgInvite`, {
         method: "POST",
         headers: {
