@@ -45,15 +45,29 @@ export function AcceptInvitationPage() {
         if (!signUpLoaded || !signUp || !setSignUpActive) {
           throw new Error("Clerk sign-up is not ready.");
         }
+        console.log("[invite] signUp.create start", {
+          clerkStatus,
+          invitationId,
+          invitedEmail,
+        });
         const result = await signUp.create({
           strategy: "ticket",
           ticket,
           password,
         });
+        console.log("[invite] signUp.create result", {
+          status: result.status,
+          createdSessionId: result.createdSessionId ?? null,
+          missingFields: "missingFields" in result ? result.missingFields : undefined,
+          unverifiedFields: "unverifiedFields" in result ? result.unverifiedFields : undefined,
+        });
         if (result.status !== "complete" || !result.createdSessionId) {
           throw new Error("Sign-up did not complete.");
         }
         await setSignUpActive({ session: result.createdSessionId });
+        console.log("[invite] signUp setActive complete", {
+          createdSessionId: result.createdSessionId,
+        });
         window.location.href = "/protected";
         return;
       }
@@ -61,13 +75,27 @@ export function AcceptInvitationPage() {
       if (!signInLoaded || !signIn || !setSignInActive) {
         throw new Error("Clerk sign-in is not ready.");
       }
+      console.log("[invite] signIn.create start", {
+        clerkStatus,
+        invitationId,
+        invitedEmail,
+      });
       const result = await signIn.create({ strategy: "ticket", ticket });
+      console.log("[invite] signIn.create result", {
+        status: result.status,
+        createdSessionId: result.createdSessionId ?? null,
+        firstFactorVerification: "firstFactorVerification" in result ? result.firstFactorVerification : undefined,
+      });
       if (result.status !== "complete" || !result.createdSessionId) {
         throw new Error("Sign-in did not complete.");
       }
       await setSignInActive({ session: result.createdSessionId });
+      console.log("[invite] signIn setActive complete", {
+        createdSessionId: result.createdSessionId,
+      });
       window.location.href = "/protected";
     } catch (error) {
+      console.error("[invite] submit failed", error);
       setAuthError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsSubmitting(false);
