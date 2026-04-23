@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useInvitationDetails } from "../hooks/useInvitationDetails";
 
 export function AcceptInvitationPage() {
-  const { invitation, inviteStatus, params, fallbackOrgDisplayName } = useInvitationDetails(window.location.search);
+  const { invitation, inviteStatus, params, invitationId, fallbackOrgDisplayName } = useInvitationDetails(window.location.search);
   const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
   const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
   const clerkStatus = params.get("__clerk_status");
