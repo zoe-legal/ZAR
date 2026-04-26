@@ -252,3 +252,57 @@ After deployment:
 4. create/replay a Clerk organization membership event
 5. confirm rows appear in `onboarding.events`
 6. confirm greenfield admin membership upserts `onboarding.status`
+
+
+## 2026-04-26 Check-In
+
+No direct code changes were made in ZAR during this check-in, but the control-plane database shape moved in a way that affects future ZAR responsibilities.
+
+### Control-plane implications now established in zInfra
+
+The control-plane DB now has an emerging matter model under a new schema:
+
+```text
+zoe_matters_czar
+```
+
+Current tables:
+
+- `matter_creation`
+- `matter_status`
+- `matter_property_def`
+- `matter_details`
+- `matters_audit_trail`
+
+This matters to ZAR because the emerging system boundary is becoming clearer:
+
+- ZAR should continue to be the authentication and authorization ingress boundary.
+- Matter access truth is still intended to live in OpenFGA, not in the control-plane Postgres schema.
+- The control-plane DB owns matter identity and current owner/state metadata, but not the full enforcement model.
+- Future `/api/...` matter and data-plane requests routed by ZAR will likely need to resolve a matter, check caller identity/org context, and then consult OpenFGA before allowing key access or data-plane operations.
+
+### Onboarding status shape changed
+
+The onboarding schema in `zInfra` was extended so `zoe_onboarding.status` now includes a new additive flag:
+
+- `is_provisioned boolean not null default false`
+
+The older `needs_onboarding` field still exists for now.
+
+Practical implication for ZAR-side onboarding code:
+
+- any future migration of onboarding logic that reads control-plane onboarding state should expect a transitional period where both fields exist
+- `needs_onboarding` is legacy semantics
+- `is_provisioned` is the new control-plane/projection-oriented field
+- code should not assume the old field disappears immediately
+
+### Data-plane boundary note
+
+The current system direction is converging on this split:
+
+- ZAR: authenticate, route, and enforce admission to protected downstream services
+- dedicated KMS-facing/data-plane service behind ZAR: the only service allowed to reach KMS
+- control-plane DB: matter identity plus related control metadata
+- OpenFGA: matter access truth
+
+So even though this repo did not change today, future ZAR work should assume the matter object is now a first-class control-plane concern and that matter-scoped data-plane access will be built around it.
