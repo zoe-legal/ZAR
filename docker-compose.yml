@@ -32,7 +32,7 @@ services:
       dockerfile: Dockerfile
     container_name: zar-backend
     environment:
-      AWS_REGION: us-west-1
+      AWS_REGION: us-west-2
       ONBOARDING_SERVICE_URL: http://zoe-onboarding-api:8790
       USER_ADMIN_SERVICE_URL: http://zoe-user-admin-api:8791
       OPENFGA_API_URL: http://openfga:8080
@@ -51,7 +51,7 @@ services:
       dockerfile: Dockerfile
     container_name: zoe-onboarding-api
     environment:
-      AWS_REGION: us-west-1
+      AWS_REGION: us-west-2
     expose:
       - "8790"
     volumes:
@@ -65,7 +65,7 @@ services:
       dockerfile: Dockerfile
     container_name: zoe-user-admin-api
     environment:
-      AWS_REGION: us-west-1
+      AWS_REGION: us-west-2
     expose:
       - "8791"
     volumes:
