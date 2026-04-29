@@ -818,21 +818,23 @@ button:hover,
   color: var(--section-text);
 }
 
-.dashboard-queue-link {
+.dashboard-queue-link,
+.dashboard-queue-link:hover {
   appearance: none;
-  background: none;
+  background: transparent;
   border: none;
+  border-radius: 0;
   padding: 0;
   font: inherit;
-  font-size: inherit;
   color: var(--accent);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  display: inline;
 }
 
 .dashboard-queue-link:hover {
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 .matters-coming-soon {
