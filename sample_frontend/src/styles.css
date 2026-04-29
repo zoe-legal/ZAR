@@ -808,6 +808,33 @@ button:hover,
   background: transparent;
 }
 
+.dashboard-queue-card {
+  max-width: 560px;
+}
+
+.dashboard-queue-message {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--section-text);
+}
+
+.dashboard-queue-link {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dashboard-queue-link:hover {
+  opacity: 0.8;
+}
+
 .matters-coming-soon {
   min-height: 280px;
   display: flex;

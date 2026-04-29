@@ -16,6 +16,7 @@ export function ProtectedContent() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [orgName, setOrgName] = useState<string | null>(null);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!auth.orgId) return;
@@ -39,7 +40,22 @@ export function ProtectedContent() {
       }
     }
 
+    async function loadAvailability() {
+      try {
+        const token = await auth.getToken({ skipCache: true });
+        const response = await fetch(`${userAdminBaseUrl}/isAvailable`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok || cancelled) return;
+        const body = await response.json() as { is_available?: boolean };
+        if (!cancelled) setIsAvailable(body.is_available ?? false);
+      } catch {
+        // leave as null — don't gate the UI on a failed availability check
+      }
+    }
+
     void loadOrgName();
+    void loadAvailability();
     return () => { cancelled = true; };
   }, [auth.orgId, auth.getToken]);
 
@@ -69,14 +85,16 @@ export function ProtectedContent() {
               <HomeIcon className="nav-icon" />
               {!sidebarCollapsed ? <span>Dashboard</span> : null}
             </button>
-            <button
-              type="button"
-              className={activeSection === "matters" ? "nav-item nav-item-active" : "nav-item"}
-              onClick={() => setActiveSection("matters")}
-            >
-              <BriefcaseIcon className="nav-icon" />
-              {!sidebarCollapsed ? <span>Matters</span> : null}
-            </button>
+            {isAvailable !== false ? (
+              <button
+                type="button"
+                className={activeSection === "matters" ? "nav-item nav-item-active" : "nav-item"}
+                onClick={() => setActiveSection("matters")}
+              >
+                <BriefcaseIcon className="nav-icon" />
+                {!sidebarCollapsed ? <span>Matters</span> : null}
+              </button>
+            ) : null}
             <div className="sidebar-nav-spacer" />
             <button
               type="button"
@@ -86,14 +104,16 @@ export function ProtectedContent() {
               <UserIcon className="nav-icon" />
               {!sidebarCollapsed ? <span>You</span> : null}
             </button>
-            <button
-              type="button"
-              className={activeSection === "users_roles" ? "nav-item nav-item-active" : "nav-item"}
-              onClick={() => setActiveSection("users_roles")}
-            >
-              <ShieldUsersIcon className="nav-icon" />
-              {!sidebarCollapsed ? <span>Users &amp; Roles</span> : null}
-            </button>
+            {isAvailable !== false ? (
+              <button
+                type="button"
+                className={activeSection === "users_roles" ? "nav-item nav-item-active" : "nav-item"}
+                onClick={() => setActiveSection("users_roles")}
+              >
+                <ShieldUsersIcon className="nav-icon" />
+                {!sidebarCollapsed ? <span>Users &amp; Roles</span> : null}
+              </button>
+            ) : null}
             <button
               type="button"
               className={activeSection === "settings" ? "nav-item nav-item-active" : "nav-item"}
@@ -126,7 +146,7 @@ export function ProtectedContent() {
 
           {auth.orgId ? (
             <>
-              {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
+              {activeSection === "dashboard" ? <DashboardPane displayName={displayName} isAvailable={isAvailable} onNavigate={setActiveSection} /> : null}
               {activeSection === "matters" ? <MattersPane /> : null}
               {activeSection === "settings" ? <SettingsPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
               {activeSection === "you" ? <YouPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
