@@ -3,7 +3,8 @@ import { useState } from "react";
 import { userAdminBaseUrl } from "../app/constants";
 import { useProtectedSession } from "../hooks/useProtectedSession";
 import { DashboardPane } from "../orgAdmin/DashboardPane";
-import { HomeIcon, MoonIcon, PanelLeftIcon, SettingsIcon, ShieldUsersIcon, SunIcon, UserIcon } from "../orgAdmin/icons";
+import { BriefcaseIcon, HomeIcon, MoonIcon, PanelLeftIcon, SettingsIcon, ShieldUsersIcon, SunIcon, UserIcon } from "../orgAdmin/icons";
+import { MattersPane } from "../orgAdmin/MattersPane";
 import { SettingsPane } from "../orgAdmin/SettingsPane";
 import type { OrgAdminPane } from "../orgAdmin/types";
 import { UsersRolesPane } from "../orgAdmin/UsersRolesPane";
@@ -43,6 +44,14 @@ export function ProtectedContent() {
             >
               <HomeIcon className="nav-icon" />
               {!sidebarCollapsed ? <span>Dashboard</span> : null}
+            </button>
+            <button
+              type="button"
+              className={activeSection === "matters" ? "nav-item nav-item-active" : "nav-item"}
+              onClick={() => setActiveSection("matters")}
+            >
+              <BriefcaseIcon className="nav-icon" />
+              {!sidebarCollapsed ? <span>Matters</span> : null}
             </button>
             <button
               type="button"
@@ -93,6 +102,7 @@ export function ProtectedContent() {
           {auth.orgId ? (
             <>
               {activeSection === "dashboard" ? <DashboardPane displayName={displayName} /> : null}
+              {activeSection === "matters" ? <MattersPane /> : null}
               {activeSection === "settings" ? <SettingsPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
               {activeSection === "you" ? <YouPane userAdminBaseUrl={userAdminBaseUrl} /> : null}
               {activeSection === "users_roles" ? <UsersRolesPane userAdminBaseUrl={userAdminBaseUrl} /> : null}

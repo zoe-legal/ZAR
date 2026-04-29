@@ -804,6 +804,32 @@ button:hover,
   background: transparent;
 }
 
+.matters-coming-soon {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.matters-coming-soon-inner {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  max-width: 360px;
+}
+
+.matters-coming-soon-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--section-text);
+}
+
+.matters-coming-soon-copy {
+  line-height: 1.6;
+}
+
 .users-roles-hero {
   gap: 20px;
 }

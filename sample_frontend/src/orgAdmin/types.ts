@@ -1,1 +1,1 @@
-export type OrgAdminPane = "dashboard" | "you" | "users_roles" | "settings";
+export type OrgAdminPane = "dashboard" | "matters" | "you" | "users_roles" | "settings";
