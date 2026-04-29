@@ -197,6 +197,7 @@ async function main() {
           || url.pathname === "/user-admin/getOrgProperties"
           || url.pathname === "/user-admin/putOrgProperties"
           || url.pathname === "/user-admin/createOrgInvite"
+          || url.pathname === "/user-admin/isAvailable"
         )
       ) {
         const token = bearerToken(req);
