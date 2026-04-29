@@ -28,6 +28,46 @@ def health() -> dict[str, str]:
     }
 
 
+@app.get("/isAvailable")
+def is_available(
+    x_internal_user_id: str | None = Header(default=None),
+    x_internal_org_id: str | None = Header(default=None),
+) -> dict[str, Any]:
+    identity = require_identity(x_internal_user_id, x_internal_org_id)
+    acquire_started = perf_counter()
+    with control_plane_connection() as conn:
+        pool_acquire_ms = elapsed_ms(acquire_started)
+        resolve_started = perf_counter()
+        external_org_id = get_clerk_org_id(conn, identity["internal_org_id"])
+        external_user_id = get_clerk_user_id(conn, identity["internal_org_id"], identity["internal_user_id"])
+        resolve_ms = elapsed_ms(resolve_started)
+        fetch_started = perf_counter()
+        availability = fetch_availability_status(conn, external_org_id, external_user_id)
+        neon_ms = elapsed_ms(fetch_started)
+        response_build_started = perf_counter()
+        response = {
+            **availability,
+            "service_timings": [{
+                "service": "zoe-user-admin",
+                "endpoint": "/isAvailable",
+                "timings": {
+                    "pool_acquire_ms": pool_acquire_ms,
+                    "resolve_ms": resolve_ms,
+                    "neon_ms": neon_ms,
+                    "response_build_ms": 0.0,
+                    "total_ms": 0.0,
+                },
+            }],
+        }
+        response_build_ms = elapsed_ms(response_build_started)
+        response["service_timings"][0]["timings"]["response_build_ms"] = response_build_ms
+        response["service_timings"][0]["timings"]["total_ms"] = round(
+            pool_acquire_ms + resolve_ms + neon_ms + response_build_ms,
+            2,
+        )
+    return response
+
+
 @app.get("/getUserProperties")
 def get_user_properties(
     x_internal_user_id: str | None = Header(default=None),
@@ -371,6 +411,47 @@ def get_clerk_org_id(conn: Any, internal_org_id: str) -> str:
     if row is None:
         raise HTTPException(status_code=500, detail="clerk_org_mapping_missing")
     return row[0]
+
+
+def get_clerk_user_id(conn: Any, internal_org_id: str, internal_user_id: str) -> str:
+    row = conn.execute(
+        """
+        select external_user_id
+        from zoe_czar.user_map
+        where internal_org_id = %s::uuid
+          and internal_user_id = %s::uuid
+          and external_user_id_source = 'clerk'
+        """,
+        (internal_org_id, internal_user_id),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=500, detail="clerk_user_mapping_missing")
+    return row[0]
+
+
+def fetch_availability_status(conn: Any, external_org_id: str, external_user_id: str) -> dict[str, Any]:
+    row = conn.execute(
+        """
+        select
+          coalesce(is_onboarded, false) as is_onboarded,
+          coalesce(is_provisioned, false) as is_provisioned
+        from zoe_onboarding.status
+        where org_id = %s
+          and user_id = %s
+        """,
+        (external_org_id, external_user_id),
+    ).fetchone()
+    if row is None:
+        is_onboarded = False
+        is_provisioned = False
+    else:
+        is_onboarded = bool(row[0])
+        is_provisioned = bool(row[1])
+    return {
+        "is_onboarded": is_onboarded,
+        "is_provisioned": is_provisioned,
+        "is_available": is_onboarded and is_provisioned,
+    }
 
 
 def get_org_display_name(conn: Any, internal_org_id: str) -> str:

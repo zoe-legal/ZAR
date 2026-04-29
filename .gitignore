@@ -11,3 +11,5 @@ sample_frontend/node_modules/
 sample_frontend/dist/
 sample_frontend/.env.local
 sample_frontend/.env.*.local
+
+__pycache__/
