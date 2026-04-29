@@ -1,5 +1,5 @@
 import { SignOutButton } from "@clerk/clerk-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { userAdminBaseUrl } from "../app/constants";
 import { useProtectedSession } from "../hooks/useProtectedSession";
 import { DashboardPane } from "../orgAdmin/DashboardPane";
@@ -15,6 +15,33 @@ export function ProtectedContent() {
   const [activeSection, setActiveSection] = useState<OrgAdminPane>("dashboard");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [orgName, setOrgName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!auth.orgId) return;
+    let cancelled = false;
+
+    async function loadOrgName() {
+      try {
+        const token = await auth.getToken({ skipCache: true });
+        const response = await fetch(`${userAdminBaseUrl}/getOrgProperties`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok || cancelled) return;
+        const body = await response.json() as Record<string, { current_value?: string | null } | unknown>;
+        const name =
+          (body["company_display_name"] as { current_value?: string | null } | undefined)?.current_value ||
+          (body["company_name"] as { current_value?: string | null } | undefined)?.current_value ||
+          null;
+        if (!cancelled) setOrgName(name);
+      } catch {
+        // sidebar falls back to empty gracefully
+      }
+    }
+
+    void loadOrgName();
+    return () => { cancelled = true; };
+  }, [auth.orgId, auth.getToken]);
 
   return (
     <main className={`admin-page theme-${theme}`}>
@@ -29,11 +56,8 @@ export function ProtectedContent() {
             >
               <PanelLeftIcon className="nav-icon" />
             </button>
-            {!sidebarCollapsed ? (
-              <div>
-                <p className="eyebrow">Org Admin</p>
-                <h2 className="sidebar-title">Sue, Grabbit, and Runne</h2>
-              </div>
+            {!sidebarCollapsed && orgName ? (
+              <h2 className="sidebar-title">{orgName}</h2>
             ) : null}
           </div>
           <nav className="sidebar-nav">
@@ -53,6 +77,7 @@ export function ProtectedContent() {
               <BriefcaseIcon className="nav-icon" />
               {!sidebarCollapsed ? <span>Matters</span> : null}
             </button>
+            <div className="sidebar-nav-spacer" />
             <button
               type="button"
               className={activeSection === "you" ? "nav-item nav-item-active" : "nav-item"}

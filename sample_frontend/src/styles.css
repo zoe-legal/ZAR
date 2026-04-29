@@ -370,9 +370,13 @@ button:hover,
 }
 
 .sidebar-nav {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  align-content: start;
+  flex: 1;
+}
+
+.sidebar-nav-spacer {
   flex: 1;
 }
 
