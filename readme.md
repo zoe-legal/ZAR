@@ -2,15 +2,14 @@
 
 ## Overview
 
-This repo currently contains three API surfaces plus a sample UI and local edge wiring:
+This repo currently contains the ZAR runtime stack, a sample config, a sample UI, and local edge wiring:
 
 - `backend/` — ZAR itself
-- `onboarding/` — greenfield onboarding API
-- `user-admin/` — property-editing API behind ZAR
 - `sample_frontend/` — Clerk test UI and current org-admin surface
+- `sample_zar_config.yaml` — example routing/policy config only
 - `docker-compose.yml` / `nginx.edge.conf` — local and dev-machine edge composition
 
-Only `backend/` is the actual Zoe Authorized Router. `onboarding/` and `user-admin/` are temporarily co-located here for speed while the contracts settle. They are not intended to remain in this repo for real deployment. Even while co-located, they are downstream services and must not be directly exposed to clients.
+Only `backend/` is the actual Zoe Authorized Router. Downstream support APIs such as onboarding and user-admin now live outside this repo and are consumed over the shared runtime network.
 
 ## Components
 
@@ -30,17 +29,9 @@ The current compose/deployment shape has these active components:
   - host port: none directly exposed
   - container port: `8788`
   - responsibilities: JWT verification, identity resolution, entitlement fetch, OpenFGA check, downstream routing, Clerk webhook handling
-- `zoe-onboarding-api`
-  - role: greenfield onboarding API behind ZAR
-  - host port: none directly exposed
-  - container port: `8790`
-- `zoe-user-admin-api`
-  - role: user and org property CRUD API behind ZAR
-  - host port: none directly exposed
-  - container port: `8791`
 - `openfga`
   - role: fine-grained authorization engine
-  - host port: none directly exposed in the dev-machine/server compose shape
+  - host port: `8080`, `8081`, `3000` exposed in the local compose shape
   - container ports: `8080`, `8081`, `3000`
 
 The public request path is currently:
@@ -51,6 +42,14 @@ The public request path is currently:
 4. `zar-edge-nginx` receives the request
 5. nginx routes public `/api/*` traffic to `zar-backend` over the `zoe_czar` Docker network
 6. ZAR routes downstream API calls to the internal services
+
+### Config Note
+
+`sample_zar_config.yaml` is only an illustrative sample for schema and routing discussion.
+
+It is not the deployed runtime source of truth.
+
+The real ZAR configuration is intended to be pulled from AWS Secrets Manager at runtime, and ZAR should eventually treat Secrets Manager as the authoritative config source.
 
 ## ZAR
 
@@ -179,45 +178,6 @@ The current greenfield flow is:
    - default entitlements
 6. ZAR returns internal identity plus entitlements
 
-## Onboarding API
-
-### Purpose
-
-`onboarding/` is the greenfield onboarding service behind ZAR.
-
-It currently owns:
-
-- checking whether a Clerk user is already onboarded
-- checking whether the relevant onboarding event exists and is fresh
-- performing the full greenfield projection into Zoe core
-
-### Current Endpoint
-
-- `GET /getInternalUserAndOrg`
-
-The internal onboarding service success response currently returns:
-
-- `internal_org_id`
-- `internal_user_id`
-- `org_ring`
-- `display_name`
-
-ZAR suppresses the internal IDs before returning the browser-visible `/api/onboarding/internal-user-and-org` response.
-
-### Current Data Sources
-
-- onboarding DB:
-  - `onboarding.events`
-  - `onboarding.status`
-- control-plane DB:
-  - `zoe_czar.*`
-  - `zoe_org_level_roles.*`
-  - `zoe_customer_details.*`
-  - `zoe_entitlements.*`
-
-### Temporary Repo Placement
-
-`onboarding/` is being left in this repo for convenience while the end-to-end flow is being built and debugged.
 
 It should be moved out into its own repo once the API contract stabilizes. It is not intended to remain co-deployed here as a permanent architectural choice.
 

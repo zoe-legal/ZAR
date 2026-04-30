@@ -1,0 +1,226 @@
+version: 1
+
+policy:
+  denial_behavior:
+    unconfigured_route: 404
+    ring_denied: 403
+    entitlement_denied: 403
+    unavailable_denied: 403
+
+routes:
+  - path: /api/user-admin/isAvailable
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-user-admin-api:8791
+              path: /isAvailable
+            require_available: false
+            entitlements:
+              all_of: []
+              any_of: []
+
+  - path: /api/user-admin/getUserProperties
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-user-admin-api:8791
+              path: /getUserProperties
+            require_available: true
+            entitlements:
+              all_of: []
+              any_of: []
+
+  - path: /api/user-admin/putUserProperties
+    methods:
+      PUT:
+        rings:
+          default:
+            backend:
+              url: http://zoe-user-admin-api:8791
+              path: /putUserProperties
+            require_available: true
+            entitlements:
+              all_of: []
+              any_of: []
+
+  - path: /api/user-admin/getOrgProperties
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-user-admin-api:8791
+              path: /getOrgProperties
+            require_available: true
+            entitlements:
+              all_of:
+                - org.settings.read
+              any_of: []
+
+  - path: /api/user-admin/putOrgProperties
+    methods:
+      PUT:
+        rings:
+          default:
+            backend:
+              url: http://zoe-user-admin-api:8791
+              path: /putOrgProperties
+            require_available: true
+            entitlements:
+              all_of:
+                - org.settings.write
+              any_of: []
+
+  - path: /api/matters
+    methods:
+      GET:
+        rings:
+          0:
+            backend:
+              url: http://zoe-data-plane-0:8788
+              path: /matters
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of: []
+          2:
+            backend:
+              url: http://zoe-data-plane-ea:8788
+              path: /matters
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of: []
+          default:
+            backend:
+              url: http://zoe-data-plane-prod:8788
+              path: /matters
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of: []
+      POST:
+        rings:
+          0:
+            backend:
+              url: http://zoe-data-plane-0:8788
+              path: /matters
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.create
+              any_of: []
+          default:
+            backend:
+              url: http://zoe-data-plane-prod:8788
+              path: /matters
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.create
+              any_of: []
+
+  - path: /api/matters/{matter_id}
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-prod:8788
+              path: /matters/{matter_id}
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of:
+                - matter.member
+                - org.admin
+      PATCH:
+        rings:
+          0:
+            backend:
+              url: http://zoe-data-plane-0:8788
+              path: /matters/{matter_id}
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+          default:
+            backend:
+              url: http://zoe-data-plane-prod:8788
+              path: /matters/{matter_id}
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/assets
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-prod:8788
+              path: /matters/{matter_id}/assets
+            require_available: true
+            entitlements:
+              all_of:
+                - assets.read
+              any_of:
+                - matter.member
+                - org.admin
+
+  - path: /api/matters/{matter_id}/assets/{asset_id}
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-prod:8788
+              path: /matters/{matter_id}/assets/{asset_id}
+            require_available: true
+            entitlements:
+              all_of:
+                - assets.read
+              any_of:
+                - matter.member
+                - org.admin
+
+  - path: /api/invitations/{zoe_invitation_id}
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-onboarding-api:8790
+              path: /getInvitationDetails
+            require_available: false
+            entitlements:
+              all_of: []
+              any_of: []
+
+  - path: /api/internal-user-and-org
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-onboarding-api:8790
+              path: /getInternalUserAndOrg
+            require_available: false
+            entitlements:
+              all_of: []
+              any_of: []

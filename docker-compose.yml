@@ -32,10 +32,10 @@ services:
       dockerfile: Dockerfile
     container_name: zar-backend
     environment:
-      AWS_REGION: us-west-2
-      ONBOARDING_SERVICE_URL: http://zoe-onboarding-api:8790
-      USER_ADMIN_SERVICE_URL: http://zoe-user-admin-api:8791
-      OPENFGA_API_URL: http://openfga:8080
+      AWS_REGION: ${AWS_REGION:-us-west-2}
+      ONBOARDING_SERVICE_URL: ${ONBOARDING_SERVICE_URL:-http://zoe-onboarding-api:8790}
+      USER_ADMIN_SERVICE_URL: ${USER_ADMIN_SERVICE_URL:-http://zoe-user-admin-api:8791}
+      OPENFGA_API_URL: ${OPENFGA_API_URL:-http://openfga:8080}
     expose:
       - "8788"
     depends_on:
@@ -45,45 +45,18 @@ services:
     networks:
       - zoe_czar
 
-  onboarding-api:
-    build:
-      context: ./onboarding
-      dockerfile: Dockerfile
-    container_name: zoe-onboarding-api
-    environment:
-      AWS_REGION: us-west-2
-    expose:
-      - "8790"
-    volumes:
-      - ~/.aws:/root/.aws:ro
-    networks:
-      - zoe_czar
-
-  user-admin-api:
-    build:
-      context: ./user-admin
-      dockerfile: Dockerfile
-    container_name: zoe-user-admin-api
-    environment:
-      AWS_REGION: us-west-2
-    expose:
-      - "8791"
-    volumes:
-      - ~/.aws:/root/.aws:ro
-    networks:
-      - zoe_czar
-
   openfga:
     image: openfga/openfga:latest
     container_name: openfga
     command: run
-    expose:
-      - "8080"
-      - "8081"
-      - "3000"
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "3000:3000"
     networks:
       - zoe_czar
 
 networks:
   zoe_czar:
     name: zoe_czar
+    external: true

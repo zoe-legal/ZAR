@@ -1,1 +1,0 @@
-# Onboarding FastAPI application package.
