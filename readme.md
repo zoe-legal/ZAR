@@ -51,6 +51,21 @@ It is not the deployed runtime source of truth.
 
 The real ZAR configuration is intended to be pulled from AWS Secrets Manager at runtime, and ZAR should eventually treat Secrets Manager as the authoritative config source.
 
+### Bring-up Order
+
+The expected local/dev-machine bring-up order is:
+
+1. bring up `zInfra` first
+2. bring up `ZAR` second
+
+Reason:
+
+- `ZAR` depends on downstream support APIs that no longer live in this repo
+- `onboarding-api` and `user-admin-api` now come from `zInfra`
+- `ZAR` still owns the runtime/auth boundary (`edge-nginx`, `sample-ui`, `zar-backend`, `openfga`)
+
+So `ZAR` can start on its own, but it will not fully serve the user-facing flow correctly until the `zInfra` stack is also up on the shared `zoe_czar` network.
+
 ## ZAR
 
 ### Role
