@@ -1,0 +1,62 @@
+services:
+  edge-nginx:
+    image: nginx:1.27-alpine
+    container_name: zar-edge-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.edge.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - sample-ui
+    networks:
+      - zoe_czar
+
+  sample-ui:
+    build:
+      context: ./sample_frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+        VITE_ZAR_BASE_URL: ${VITE_ZAR_BASE_URL:-/api}
+    container_name: zar-sample-ui
+    expose:
+      - "5174"
+    depends_on:
+      - zar-backend
+    networks:
+      - zoe_czar
+
+  zar-backend:
+    build:
+      context: ./v0.2
+      dockerfile: Dockerfile
+    container_name: zar-backend
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-west-2}
+      ONBOARDING_SERVICE_URL: ${ONBOARDING_SERVICE_URL:-http://zoe-onboarding-api:8790}
+      USER_ADMIN_SERVICE_URL: ${USER_ADMIN_SERVICE_URL:-http://zoe-user-admin-api:8791}
+      OPENFGA_API_URL: ${OPENFGA_API_URL:-http://openfga:8080}
+    expose:
+      - "8788"
+    depends_on:
+      - openfga
+    volumes:
+      - ~/.aws:/home/node/.aws:ro
+    networks:
+      - zoe_czar
+
+  openfga:
+    image: openfga/openfga:latest
+    container_name: openfga
+    command: run
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "3000:3000"
+    networks:
+      - zoe_czar
+
+networks:
+  zoe_czar:
+    name: zoe_czar
+    external: true

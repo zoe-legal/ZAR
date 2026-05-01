@@ -6,6 +6,8 @@ coverage/
 
 backend/node_modules/
 backend/dist/
+v0.2/node_modules/
+v0.2/dist/
 
 sample_frontend/node_modules/
 sample_frontend/dist/

@@ -1,0 +1,21 @@
+entitlement_key,kind,description,notes
+user.profile.read,entitlement,Read caller-owned user profile properties,User settings/profile surface
+user.profile.write,entitlement,Write caller-owned user profile properties,User settings/profile surface
+org.profile.read,entitlement,Read org profile properties,Org admin settings surface
+org.profile.write,entitlement,Write org profile properties,Org admin settings surface
+org.users.invite,entitlement,Create org invitations,Org admin invite flow
+matters.read,entitlement,List and read matter metadata,Data plane matter surface
+matters.create,entitlement,Create matters,Data plane matter surface
+matters.update,entitlement,Patch matter metadata,Data plane matter surface
+matters.archive,entitlement,Archive matters,Data plane matter lifecycle
+matters.delete,entitlement,Hard-delete matters,Data plane matter lifecycle
+matters.restore,entitlement,Restore archived matters,Data plane matter lifecycle
+uploads.read,entitlement,List and read upload attempts,Data plane upload surface
+uploads.create,entitlement,Create upload attempts,Data plane upload surface
+uploads.finalize,entitlement,Finalize upload attempts into canonical assets,Data plane upload surface
+assets.read,entitlement,List and read canonical asset metadata,Data plane asset surface
+derivatives.read,entitlement,List and read derivative metadata,Data plane derivative surface
+derivatives.create,entitlement,Create derivatives,Data plane derivative surface
+org.admin,policy_predicate,Caller is an org admin/owner,Used as any_of policy condition
+matter.member,policy_predicate,Caller is a member of the specific matter,Used as any_of policy condition
+matter.editor,policy_predicate,Caller can edit the specific matter,Used as any_of policy condition
