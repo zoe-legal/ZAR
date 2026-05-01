@@ -1,3 +1,7 @@
+# Status Note
+
+As of May 1, 2026, `ZAR v0.2` has not yet been tested enough to be treated as the deployed development runtime. `dev` remains on `v0.1` until `v0.2` has been validated more thoroughly end-to-end.
+
 ## Goal
 
 Build `ZAR v0.2` as a clean, config-driven router/policy layer without breaking the current working `v0.1` path.
@@ -284,4 +288,3 @@ The sequence should be:
 - Secrets Manager-backed config load path
 - temporary OpenAPI pass-through support
 - migration plan from `v0.1` to `v0.2`
-
