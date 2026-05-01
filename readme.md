@@ -154,6 +154,85 @@ On onboarding-routed calls, responses also include:
 
 This gives a baseline for the actual router cost before optimization work.
 
+## Login And Onboarding Flow
+
+### Current Browser-Facing Flow
+
+The current user-facing login/bootstrap path is:
+
+1. `sample_frontend` loads and checks the Clerk browser session
+2. if there is no Clerk session, the UI renders sign-in / sign-up
+3. if there is a Clerk session, the UI calls `GET /api/auth/session` through ZAR
+4. the UI then polls `GET /api/onboarding/internal-user-and-org` through ZAR
+5. ZAR:
+   - verifies the Clerk JWT
+   - resolves internal identity
+   - fetches org entitlements
+   - checks OpenFGA
+   - calls downstream `onboarding-api GET /getInternalUserAndOrg`
+6. ZAR strips internal IDs from the downstream onboarding response before returning it to the browser
+7. the frontend keeps polling until onboarding reaches a terminal state:
+   - `status = failed`
+   - `status = internal_user_details`
+8. on `internal_user_details`, the UI branches on `is_available`
+   - `true` unlocks the app
+   - `false` keeps the user gated in a pending/unavailable state
+
+The frontend-visible onboarding bootstrap response now includes:
+
+- `status`
+- `display_name`
+- `org_ring`
+- `is_onboarded`
+- `is_provisioned`
+- `is_available`
+- `entitled`
+- `fga_allowed`
+- `service_timings`
+- `timings`
+
+### Diagram
+
+![User Login and Onboarding Flow](./User%20Login%20and%20Onboarding%20Flow.png)
+
+### Mermaid Source
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant sample_frontend
+    participant ZAR
+    participant onboarding_api as onboarding-api
+
+    sample_frontend->>sample_frontend: Load app shell
+    sample_frontend->>sample_frontend: Check Clerk browser session
+
+    alt No Clerk session
+        sample_frontend->>sample_frontend: Render sign-in / sign-up flow
+    else Clerk session present
+        sample_frontend->>ZAR: GET /api/auth/session<br/>Authorization: Bearer <Clerk JWT>
+        ZAR-->>sample_frontend: Authenticated session context
+
+        loop Retry until terminal onboarding status
+            sample_frontend->>ZAR: GET /api/onboarding/internal-user-and-org<br/>Authorization: Bearer <Clerk JWT>
+            ZAR->>ZAR: Verify Clerk JWT<br/>Resolve internal identity<br/>Fetch entitlements<br/>Check OpenFGA
+            ZAR->>onboarding_api: GET /getInternalUserAndOrg<br/>X-Clerk-User-Id / X-Clerk-Org-Id
+            onboarding_api-->>ZAR: status = pending | failed | internal_user_details<br/>internal ids + display_name + org_ring + availability
+            ZAR-->>sample_frontend: status = pending | failed | internal_user_details<br/>display_name / org_ring / is_onboarded / is_provisioned / is_available
+        end
+
+        alt status = internal_user_details and is_available = true
+            sample_frontend->>sample_frontend: Unlock full app navigation
+            sample_frontend->>sample_frontend: Route user into dashboard / matters flow
+        else status = internal_user_details and is_available = false
+            sample_frontend->>sample_frontend: Keep user gated
+            sample_frontend->>sample_frontend: Show unavailable / pending provisioning state
+        else status = failed
+            sample_frontend->>sample_frontend: Show onboarding failure state
+        end
+    end
+```
+
 ### Current OpenFGA State
 
 - real OpenFGA service in compose
