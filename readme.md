@@ -191,7 +191,7 @@ The frontend-visible onboarding bootstrap response now includes:
 - `service_timings`
 - `timings`
 
-### Mermaid Source
+### Flow Diagram (UML)
 
 ```mermaid
 sequenceDiagram
