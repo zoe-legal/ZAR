@@ -219,9 +219,19 @@ export async function evaluateRoutePolicy(
   entitlements: EntitlementRecord[],
   availability: AvailabilityRecord,
   fgaAllowed: boolean
-): Promise<{ allowed: boolean; deniedBy: "availability" | "entitlements" | null }> {
+): Promise<{
+  allowed: boolean;
+  deniedBy: "availability" | "entitlements" | null;
+  failedAllOf: string[];
+  anyOf: string[];
+}> {
   if (routeDefinition.require_available && !availability.is_available) {
-    return { allowed: false, deniedBy: "availability" };
+    return {
+      allowed: false,
+      deniedBy: "availability",
+      failedAllOf: [],
+      anyOf: routeDefinition.entitlements.any_of,
+    };
   }
 
   const activeEntitlements = new Set(
@@ -230,10 +240,20 @@ export async function evaluateRoutePolicy(
       .map((row) => row.entitlement_key)
   );
 
+  const failedAllOf: string[] = [];
   for (const key of routeDefinition.entitlements.all_of) {
     if (!(await policyConditionSatisfied(db, identity, activeEntitlements, key, fgaAllowed))) {
-      return { allowed: false, deniedBy: "entitlements" };
+      failedAllOf.push(key);
     }
+  }
+
+  if (failedAllOf.length > 0) {
+    return {
+      allowed: false,
+      deniedBy: "entitlements",
+      failedAllOf,
+      anyOf: routeDefinition.entitlements.any_of,
+    };
   }
 
   if (routeDefinition.entitlements.any_of.length > 0) {
@@ -245,11 +265,16 @@ export async function evaluateRoutePolicy(
       }
     }
     if (!satisfied) {
-      return { allowed: false, deniedBy: "entitlements" };
+      return {
+        allowed: false,
+        deniedBy: "entitlements",
+        failedAllOf: [],
+        anyOf: routeDefinition.entitlements.any_of,
+      };
     }
   }
 
-  return { allowed: true, deniedBy: null };
+  return { allowed: true, deniedBy: null, failedAllOf: [], anyOf: routeDefinition.entitlements.any_of };
 }
 
 async function policyConditionSatisfied(

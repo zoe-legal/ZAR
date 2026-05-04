@@ -26,6 +26,13 @@ async function main() {
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    const requestId = crypto.randomUUID();
+    logEvent("request.start", {
+      request_id: requestId,
+      method: req.method ?? "GET",
+      path: url.pathname,
+      query: url.search,
+    });
 
     try {
       if (req.method === "OPTIONS") {
@@ -86,21 +93,67 @@ async function main() {
         let fgaAllowed = true;
 
         if (!isPublic && token) {
+          logEvent("auth.begin", { request_id: requestId, public_path: publicPath });
           verifiedToken = await verifyToken(token, { secretKey: state.secrets.clerk_secret_key });
           const clerkUserId = verifiedToken.sub;
           const clerkOrgId = clerkOrgIdFromToken(verifiedToken);
+          logEvent("auth.verified", {
+            request_id: requestId,
+            clerk_user_id: clerkUserId,
+            clerk_org_id: clerkOrgId,
+            clerk_session_id: verifiedToken.sid ?? null,
+          });
           identity = await resolveInternalIdentity(controlPlaneDb, clerkUserId, clerkOrgId);
+          logEvent("auth.identity_resolved", {
+            request_id: requestId,
+            identity: serializeIdentity(identity),
+          });
           entitlements = await fetchOrgEntitlements(controlPlaneDb, identity.internal_org_id);
+          logEvent("auth.entitlements_loaded", {
+            request_id: requestId,
+            entitlement_keys: entitlements
+              .filter((row) => row.current_status === "active")
+              .map((row) => row.entitlement_key),
+            entitlement_count: entitlements.length,
+          });
           availability = await fetchAvailability(controlPlaneDb, identity);
+          logEvent("auth.availability_loaded", {
+            request_id: requestId,
+            availability,
+          });
           fgaAllowed = await checkFgaAllowed(openFga, identity, url.pathname, req.method ?? "GET");
+          logEvent("auth.fga_checked", {
+            request_id: requestId,
+            fga_allowed: fgaAllowed,
+            fga_object_path: url.pathname,
+            fga_method: req.method ?? "GET",
+          });
         }
 
         const ringId = identity?.org_ring ?? null;
         const routeMatch = matchRoute(compiledRoutes, req.method ?? "GET", publicPath, ringId);
         if (!routeMatch) {
+          logEvent("route.not_found", {
+            request_id: requestId,
+            method: req.method ?? "GET",
+            public_path: publicPath,
+            ring_id: ringId,
+          });
           sendJson(res, state.schema.policy.denial_behavior.unconfigured_route, { error: "not_found" });
           return;
         }
+        logEvent("route.matched", {
+          request_id: requestId,
+          method: req.method ?? "GET",
+          public_path: publicPath,
+          route_path: routeMatch.route.path,
+          ring_key: routeMatch.ringKey,
+          params: routeMatch.params,
+          backend_url: routeMatch.ringDefinition.backend.url,
+          backend_path: routeMatch.ringDefinition.backend.path,
+          require_available: routeMatch.ringDefinition.require_available,
+          entitlements: routeMatch.ringDefinition.entitlements,
+        });
 
         if (!isPublic && identity) {
           const policy = await evaluateRoutePolicy(
@@ -115,11 +168,37 @@ async function main() {
             const statusCode = policy.deniedBy === "availability"
               ? state.schema.policy.denial_behavior.unavailable_denied
               : state.schema.policy.denial_behavior.entitlement_denied;
+            logEvent("auth.policy_denied", {
+              request_id: requestId,
+              denied_by: policy.deniedBy,
+              status_code: statusCode,
+              identity: serializeIdentity(identity),
+              active_entitlement_keys: entitlements
+                .filter((row) => row.current_status === "active")
+                .map((row) => row.entitlement_key),
+              availability,
+              fga_allowed: fgaAllowed,
+              route_path: routeMatch.route.path,
+              ring_key: routeMatch.ringKey,
+              failed_all_of: policy.failedAllOf,
+              any_of: policy.anyOf,
+            });
             sendJson(res, statusCode, { error: policy.deniedBy === "availability" ? "unavailable" : "forbidden" });
             return;
           }
+          logEvent("auth.policy_allowed", {
+            request_id: requestId,
+            route_path: routeMatch.route.path,
+            ring_key: routeMatch.ringKey,
+            identity: serializeIdentity(identity),
+          });
         }
 
+        logEvent("proxy.begin", {
+          request_id: requestId,
+          upstream_url: routeMatch.ringDefinition.backend.url,
+          upstream_path: routeMatch.ringDefinition.backend.path,
+        });
         const upstreamResponse = await proxyRequest(
           req,
           routeMatch.ringDefinition.backend.url,
@@ -132,6 +211,11 @@ async function main() {
               }
             : {}
         );
+        logEvent("proxy.response", {
+          request_id: requestId,
+          upstream_status: upstreamResponse.status,
+          upstream_content_type: upstreamResponse.headers.get("content-type"),
+        });
         await relayResponse(res, upstreamResponse);
         return;
       }
@@ -141,11 +225,19 @@ async function main() {
       const message = error instanceof Error ? error.message : "internal_error";
       const isVerifyTokenError = /token|jwt|signature|issuer|audience|session/i.test(message);
       if (isVerifyTokenError) {
-        console.warn(JSON.stringify({ event: "auth.session.invalid_token", message }));
+        logEvent("auth.invalid_token", {
+          request_id: requestId,
+          path: url.pathname,
+          message,
+        });
         sendJson(res, 401, { error: "invalid_bearer_token" });
         return;
       }
-      console.error(JSON.stringify({ event: "zar.v0_2.error", message }));
+      logEvent("error", {
+        request_id: requestId,
+        path: url.pathname,
+        message,
+      }, "error");
       sendJson(res, 500, { error: "internal_error", message });
     }
   });
@@ -408,6 +500,42 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void 
 
 function elapsedMs(started: number): number {
   return Math.round((performance.now() - started) * 100) / 100;
+}
+
+function serializeIdentity(
+  identity: {
+    clerk_user_id: string;
+    clerk_org_id: string | null;
+    internal_user_id: string | null;
+    internal_org_id: string | null;
+    external_user_id: string;
+    external_org_id: string | null;
+    org_ring: number | null;
+  } | null
+) {
+  if (!identity) return null;
+  return {
+    clerk_user_id: identity.clerk_user_id,
+    clerk_org_id: identity.clerk_org_id,
+    internal_user_id: identity.internal_user_id,
+    internal_org_id: identity.internal_org_id,
+    external_user_id: identity.external_user_id,
+    external_org_id: identity.external_org_id,
+    org_ring: identity.org_ring,
+  };
+}
+
+function logEvent(event: string, payload: Record<string, unknown>, level: "info" | "warn" | "error" = "info"): void {
+  const message = JSON.stringify({ event: `zar.v0_2.${event}`, ...payload });
+  if (level === "warn") {
+    console.warn(message);
+    return;
+  }
+  if (level === "error") {
+    console.error(message);
+    return;
+  }
+  console.info(message);
 }
 
 main().catch((error) => {
