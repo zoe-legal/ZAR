@@ -73,19 +73,6 @@ routes:
               all_of: []
               any_of: []
 
-  - path: /api/data-plane/openapi-admin.json
-    methods:
-      GET:
-        rings:
-          default:
-            backend:
-              url: http://zoe-data-plane-user-api:8788
-              path: /openapi.json
-            require_available: false
-            entitlements:
-              all_of: []
-              any_of: []
-
   - path: /api/invitations/{zoe_invitation_id}
     methods:
       GET:
@@ -124,6 +111,19 @@ routes:
             entitlements:
               all_of:
                 - user.profile.read
+              any_of: []
+
+  - path: /api/user-admin/isAvailable
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-user-admin-api:8791
+              path: /isAvailable
+            require_available: false
+            entitlements:
+              all_of: []
               any_of: []
 
   - path: /api/user-admin/putUserProperties
