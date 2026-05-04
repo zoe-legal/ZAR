@@ -81,7 +81,7 @@ async function main() {
       }
 
       const publicPath = toPublicPath(url.pathname);
-      const isPublic = publicPath.includes("/openapi.") || publicPath.startsWith("/api/invitations/");
+      const isPublic = isPublicRoute(publicPath);
       if (!isReservedInternalPath(url.pathname)) {
         const token = isPublic ? null : requiredBearerToken(req, res);
         if (!isPublic && !token) return;
@@ -408,6 +408,11 @@ function requiredBearerToken(req: IncomingMessage, res: ServerResponse): string 
 
 function toPublicPath(pathname: string): string {
   return pathname.startsWith("/api/") ? pathname : `/api${pathname}`;
+}
+
+function isPublicRoute(publicPath: string): boolean {
+  return publicPath.includes("/openapi")
+    || publicPath.startsWith("/api/invitations/");
 }
 
 function isReservedInternalPath(pathname: string): boolean {
