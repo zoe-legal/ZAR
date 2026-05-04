@@ -346,10 +346,21 @@ function bearerToken(req: IncomingMessage): string | null {
   return scheme?.toLowerCase() === "bearer" && token ? token : null;
 }
 
-function clerkOrgIdFromToken(verifiedToken: Awaited<ReturnType<typeof verifyToken>>): string | null {
-  const payload = verifiedToken.payload as Record<string, unknown>;
-  const orgId = payload.org_id;
-  return typeof orgId === "string" && orgId.trim() !== "" ? orgId : null;
+function clerkOrgIdFromToken(
+  verifiedToken: Awaited<ReturnType<typeof verifyToken>> & {
+    org_id?: unknown;
+    o?: { id?: unknown };
+  }
+): string | null {
+  if (typeof verifiedToken.org_id === "string" && verifiedToken.org_id.trim() !== "") {
+    return verifiedToken.org_id;
+  }
+  if (typeof verifiedToken.o?.id === "string" && verifiedToken.o.id.trim() !== "") {
+    return verifiedToken.o.id;
+  }
+  const payload = (verifiedToken as { payload?: Record<string, unknown> }).payload;
+  const payloadOrgId = payload?.org_id;
+  return typeof payloadOrgId === "string" && payloadOrgId.trim() !== "" ? payloadOrgId : null;
 }
 
 function svixHeaders(req: IncomingMessage): Record<string, string> {
