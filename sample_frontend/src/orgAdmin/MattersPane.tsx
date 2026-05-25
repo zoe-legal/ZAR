@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { dataPlaneBaseUrl } from "../app/constants";
+import { zarBaseUrl } from "../app/constants";
 
 type MatterState = "active" | "archived" | "hard_deleted";
 
@@ -38,8 +38,8 @@ export function MattersPane() {
     try {
       const token = await auth.getToken({ skipCache: true });
       const url = cursor
-        ? `${dataPlaneBaseUrl}/matters?cursor=${encodeURIComponent(cursor)}`
-        : `${dataPlaneBaseUrl}/matters`;
+        ? `${zarBaseUrl}/matters?cursor=${encodeURIComponent(cursor)}`
+        : `${zarBaseUrl}/matters`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed");
       const body = await res.json() as MatterListResponse;
@@ -201,7 +201,7 @@ function CreateModal({
     setError(null);
     try {
       const token = await getToken({ skipCache: true });
-      const res = await fetch(`${dataPlaneBaseUrl}/matters`, {
+      const res = await fetch(`${zarBaseUrl}/matters`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -273,7 +273,7 @@ function ArchiveModal({
     setError(null);
     try {
       const token = await getToken({ skipCache: true });
-      const res = await fetch(`${dataPlaneBaseUrl}/matters/${matter.matter_id}/archive`, {
+      const res = await fetch(`${zarBaseUrl}/matters/${matter.matter_id}/archive`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
