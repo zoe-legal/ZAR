@@ -322,6 +322,201 @@ routes:
               any_of:
                 - org.admin
 
+  - path: /api/matters/{matter_id}/conversations
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of:
+                - matter.member
+                - org.admin
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of:
+                - matter.member
+                - org.admin
+      PATCH:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/archive
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/archive
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/lock
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/lock
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/restore
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/restore
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/hard-delete
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/hard-delete
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.delete
+              any_of:
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/shares
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/shares
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of:
+                - matter.member
+                - org.admin
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/shares
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/shares/{conversation_share_id}/revoke
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/shares/{conversation_share_id}/revoke
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
+  - path: /api/matters/{matter_id}/conversations/{conversation_id}/asset-context-links
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/asset-context-links
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.read
+              any_of:
+                - matter.member
+                - org.admin
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-user-api:8788
+              path: /matters/{matter_id}/conversations/{conversation_id}/asset-context-links
+            require_available: true
+            entitlements:
+              all_of:
+                - matters.update
+              any_of:
+                - matter.editor
+                - org.admin
+
   - path: /api/matters/{matter_id}/upload-attempts
     methods:
       GET:
