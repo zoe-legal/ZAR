@@ -65,21 +65,13 @@ async function runUpload(
   if (!attempt.upload_target_url) throw new Error("No upload target URL returned");
 
   onPhase("uploading");
-  const fields = attempt.upload_target_fields ?? {};
-  if (Object.keys(fields).length > 0) {
-    const form = new FormData();
-    for (const [k, v] of Object.entries(fields)) form.append(k, v);
-    form.append("file", file);
-    const s3Res = await fetch(attempt.upload_target_url, { method: "POST", body: form });
-    if (!s3Res.ok) throw new Error(`Upload to storage failed (${s3Res.status})`);
-  } else {
-    const s3Res = await fetch(attempt.upload_target_url, {
-      method: attempt.upload_method ?? "PUT",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
-      body: file,
-    });
-    if (!s3Res.ok) throw new Error(`Upload to storage failed (${s3Res.status})`);
-  }
+  const contentType = file.type || "application/octet-stream";
+  const s3Res = await fetch(attempt.upload_target_url, {
+    method: attempt.upload_method ?? "PUT",
+    headers: { "Content-Type": contentType },
+    body: file,
+  });
+  if (!s3Res.ok) throw new Error(`Upload to storage failed (${s3Res.status})`);
 
   onPhase("finalizing");
   const finalizeToken = await getToken({ skipCache: true });
