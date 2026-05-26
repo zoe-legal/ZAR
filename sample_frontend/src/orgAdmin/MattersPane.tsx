@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { zarBaseUrl } from "../app/constants";
+import { MatterDetailPane } from "./MatterDetailPane";
 
 type MatterState = "active" | "archived" | "hard_deleted";
 
@@ -33,6 +34,16 @@ export function MattersPane() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [modal, setModal] = useState<ModalState>(null);
+  const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
+
+  if (selectedMatter) {
+    return (
+      <MatterDetailPane
+        matter={selectedMatter}
+        onBack={() => setSelectedMatter(null)}
+      />
+    );
+  }
 
   async function fetchMatters(cursor?: string) {
     try {
@@ -103,7 +114,11 @@ export function MattersPane() {
           <section className="settings-card matters-list-card">
             <ul className="matters-list">
               {visibleMatters.map((matter) => (
-                <li key={matter.matter_id} className="matter-row">
+                <li
+                  key={matter.matter_id}
+                  className="matter-row matter-row-clickable"
+                  onClick={() => setSelectedMatter(matter)}
+                >
                   <div className="matter-row-main">
                     <span className="matter-name">{matterName(matter)}</span>
                     <span className={`matter-state-badge matter-state-${matter.matter_state}`}>
@@ -119,7 +134,7 @@ export function MattersPane() {
                         <button
                           type="button"
                           className="copy-button"
-                          onClick={() => setModal({ type: "archive", matter })}
+                          onClick={(e) => { e.stopPropagation(); setModal({ type: "archive", matter }); }}
                         >
                           Archive
                         </button>
@@ -129,6 +144,7 @@ export function MattersPane() {
                         className="danger-button"
                         disabled
                         title="Deletion is not yet available"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         Delete
                       </button>
