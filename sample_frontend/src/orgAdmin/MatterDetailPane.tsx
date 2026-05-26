@@ -59,9 +59,10 @@ export function MatterDetailPane({
   async function fetchAssets(cursor?: string) {
     try {
       const token = await auth.getToken({ skipCache: true });
+      const includeStates = "quarantined,processing,available";
       const url = cursor
-        ? `${zarBaseUrl}/matters/${matter.matter_id}/assets?cursor=${encodeURIComponent(cursor)}`
-        : `${zarBaseUrl}/matters/${matter.matter_id}/assets`;
+        ? `${zarBaseUrl}/matters/${matter.matter_id}/assets?include_states=${includeStates}&cursor=${encodeURIComponent(cursor)}`
+        : `${zarBaseUrl}/matters/${matter.matter_id}/assets?include_states=${includeStates}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed");
       const body = (await res.json()) as AssetListResponse;
