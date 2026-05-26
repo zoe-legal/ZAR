@@ -174,9 +174,11 @@ export function UploadModal({
           {!running && (
             <label
               className="upload-drop-zone"
-              onClick={(e) => {
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onDrop={(e) => {
                 e.preventDefault();
-                inputRef.current?.click();
+                e.stopPropagation();
+                if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
               }}
             >
               <input
