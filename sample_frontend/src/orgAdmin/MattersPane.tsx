@@ -36,15 +36,6 @@ export function MattersPane() {
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
 
-  if (selectedMatter) {
-    return (
-      <MatterDetailPane
-        matter={selectedMatter}
-        onBack={() => setSelectedMatter(null)}
-      />
-    );
-  }
-
   async function fetchMatters(cursor?: string) {
     try {
       const token = await auth.getToken({ skipCache: true });
@@ -63,6 +54,15 @@ export function MattersPane() {
   }
 
   useEffect(() => { void fetchMatters(); }, [auth.getToken]);
+
+  if (selectedMatter) {
+    return (
+      <MatterDetailPane
+        matter={selectedMatter}
+        onBack={() => setSelectedMatter(null)}
+      />
+    );
+  }
 
   if (loadState === "loading") {
     return (
