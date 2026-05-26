@@ -73,6 +73,19 @@ routes:
               all_of: []
               any_of: []
 
+  - path: /api/data-plane/openapi-admin.json
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /openapi.json
+            require_available: false
+            entitlements:
+              all_of: []
+              any_of: []
+
   - path: /api/invitations/{zoe_invitation_id}
     methods:
       GET:
@@ -608,6 +621,96 @@ routes:
                 - assets.read
               any_of:
                 - matter.member
+                - org.admin
+
+  - path: /api/data-plane/admin-only/upload-attempts
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /admin-only/upload-attempts
+            require_available: true
+            entitlements:
+              all_of:
+                - uploads.read
+              any_of:
+                - org.admin
+
+  - path: /api/data-plane/admin-only/upload-attempts/{upload_attempt_id}/claim-processing
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /admin-only/upload-attempts/{upload_attempt_id}/claim-processing
+            require_available: true
+            entitlements:
+              all_of:
+                - uploads.finalize
+              any_of:
+                - org.admin
+
+  - path: /api/data-plane/admin-only/upload-attempts/{upload_attempt_id}/mark-failed
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /admin-only/upload-attempts/{upload_attempt_id}/mark-failed
+            require_available: true
+            entitlements:
+              all_of:
+                - uploads.finalize
+              any_of:
+                - org.admin
+
+  - path: /api/data-plane/admin-only/upload-attempts/{upload_attempt_id}/promote
+    methods:
+      POST:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /admin-only/upload-attempts/{upload_attempt_id}/promote
+            require_available: true
+            entitlements:
+              all_of:
+                - uploads.finalize
+              any_of:
+                - org.admin
+
+  - path: /api/data-plane/admin-only/assets
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /admin-only/assets
+            require_available: true
+            entitlements:
+              all_of:
+                - assets.read
+              any_of:
+                - org.admin
+
+  - path: /api/data-plane/admin-only/matters/{matter_id}/assets
+    methods:
+      GET:
+        rings:
+          default:
+            backend:
+              url: http://zoe-data-plane-admin-only-api:8786
+              path: /admin-only/matters/{matter_id}/assets
+            require_available: true
+            entitlements:
+              all_of:
+                - assets.read
+              any_of:
                 - org.admin
 
   - path: /api/matters/{matter_id}/assets/{asset_id}/derivatives
