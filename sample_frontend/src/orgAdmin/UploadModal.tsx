@@ -67,7 +67,7 @@ async function runUpload(
   onPhase("uploading");
   const contentType = file.type || "application/octet-stream";
   const s3Res = await fetch(attempt.upload_target_url, {
-    method: attempt.upload_method ?? "PUT",
+    method: "PUT",
     headers: { "Content-Type": contentType },
     body: file,
   });
